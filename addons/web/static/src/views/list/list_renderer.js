@@ -124,26 +124,6 @@ export class ListRenderer extends Component {
             this.allColumns = this.processAllColumn(nextProps.archInfo.columns, nextProps.list);
             this.state.columns = this.getActiveColumns(nextProps.list);
         });
-        onPatched(async () => {
-            // HACK: we need to wait for the next tick to be sure that the Field components are patched.
-            // OWL don't wait the patch for the children components if the children trigger a patch by himself.
-            await Promise.resolve();
-
-            const editedRecord = this.props.list.editedRecord;
-            if (editedRecord && this.activeRowId !== editedRecord.id) {
-                if (this.cellToFocus && this.cellToFocus.record === editedRecord) {
-                    const column = this.cellToFocus.column;
-                    const forward = this.cellToFocus.forward;
-                    this.focusCell(column, forward);
-                } else if (this.lastEditedCell) {
-                    this.focusCell(this.lastEditedCell.column, true);
-                } else {
-                    this.focusCell(this.state.columns[0]);
-                }
-            }
-            this.cellToFocus = null;
-            this.lastEditedCell = null;
-        });
         let dataRowId;
         this.rootRef = useRef("root");
         this.resequencePromise = Promise.resolve();
@@ -213,6 +193,26 @@ export class ListRenderer extends Component {
         });
         useExternalListener(window, "blur", (ev) => {
             this.shiftKeyMode = false;
+        });
+        onPatched(async () => {
+            // HACK: we need to wait for the next tick to be sure that the Field components are patched.
+            // OWL don't wait the patch for the children components if the children trigger a patch by himself.
+            await Promise.resolve();
+
+            const editedRecord = this.props.list.editedRecord;
+            if (editedRecord && this.activeRowId !== editedRecord.id) {
+                if (this.cellToFocus && this.cellToFocus.record === editedRecord) {
+                    const column = this.cellToFocus.column;
+                    const forward = this.cellToFocus.forward;
+                    this.focusCell(column, forward);
+                } else if (this.lastEditedCell) {
+                    this.focusCell(this.lastEditedCell.column, true);
+                } else {
+                    this.focusCell(this.state.columns[0]);
+                }
+            }
+            this.cellToFocus = null;
+            this.lastEditedCell = null;
         });
         this.isRTL = localization.direction === "rtl";
     }
@@ -799,7 +799,7 @@ export class ListRenderer extends Component {
 
     getSortableIconClass(column) {
         const { orderBy } = this.props.list;
-        const classNames = this.isSortable(column) ? ["fa", "fa-lg", "px-2"] : ["d-none"];
+        const classNames = this.isSortable(column) ? ["fa", "fa-lg"] : ["d-none"];
         if (orderBy.length && orderBy[0].name === column.name) {
             classNames.push(orderBy[0].asc ? "fa-angle-up" : "fa-angle-down");
         } else {
@@ -1056,7 +1056,7 @@ export class ListRenderer extends Component {
             optionalColumn.forEach((col) => {
                 this.optionalActiveFields[col.name] = optionalActiveFields.includes(col.name);
             });
-        } else {
+        } else if (optionalActiveFields !== "") {
             for (const col of optionalColumn) {
                 this.optionalActiveFields[col.name] = col.optional === "show";
             }

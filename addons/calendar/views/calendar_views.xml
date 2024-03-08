@@ -139,7 +139,7 @@
                                 <span invisible="allday" style="white-space: pre;"> or </span>
                                 <div class="d-flex gap-2">
                                     <label for="allday" class=""/>
-                                    <field name="allday" class="oe_inline" widget="boolean_toggle" force_save="1" readonly="not user_can_edit"/>
+                                    <field name="allday" class="oe_inline" widget="boolean_toggle" force_save="1" options="{'autosave': False}" readonly="not user_can_edit"/>
                                 </div>
                             </div>
                             <field name="event_tz" invisible="not recurrency" readonly="not user_can_edit"/>
@@ -232,13 +232,14 @@
                             <div class="d-flex align-items-baseline" colspan="2">
                                 <field name="partner_ids" widget="many2manyattendee"
                                     placeholder="Select attendees..."
-                                    context="{'force_email':True}"
+                                    options="{'no_quick_create': True}"
+                                    context="{'form_view_ref': 'base.view_partner_simple_form'}"
                                     domain="[('type','!=','private')]"
                                     class="oe_inline"
                                     readonly="not user_can_edit"
                                 />
                             </div>
-                            <div class="alert alert-warning o_form_header mt-2" invisible="not invalid_email_partner_ids" role="status">
+                            <div class="alert alert-warning o_form_header mt-2" colspan="2" invisible="not invalid_email_partner_ids" role="status">
                                 <p><strong>The following attendees have invalid email addresses and won't receive any email notifications:</strong></p>
                                 <field name="invalid_email_partner_ids" widget="many2manyattendee" class="oe_inline"/>
                             </div>
@@ -311,7 +312,8 @@
                         <field name="allday"/>
                         <field name="partner_ids" widget="many2manyattendee"
                             placeholder="Add attendees..."
-                            context="{'force_email':True}"
+                            options="{'no_quick_create': True}"
+                            context="{'form_view_ref': 'base.view_partner_simple_form'}"
                             class="oe_inline"
                         />
                         <label for="videocall_location" class="opacity-100"/>

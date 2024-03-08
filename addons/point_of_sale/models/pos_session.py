@@ -799,7 +799,8 @@ class PosSession(models.Model):
                     stock_moves = self.env['stock.move'].sudo().search([
                         ('picking_id', 'in', order.picking_ids.ids),
                         ('company_id.anglo_saxon_accounting', '=', True),
-                        ('product_id.categ_id.property_valuation', '=', 'real_time')
+                        ('product_id.categ_id.property_valuation', '=', 'real_time'),
+                        ('product_id.type', '=', 'product'),
                     ])
                     for move in stock_moves:
                         exp_key = move.product_id._get_product_accounts()['expense']
@@ -829,6 +830,7 @@ class PosSession(models.Model):
                     ('picking_id', 'in', global_session_pickings.ids),
                     ('company_id.anglo_saxon_accounting', '=', True),
                     ('product_id.categ_id.property_valuation', '=', 'real_time'),
+                    ('product_id.type', '=', 'product'),
                 ])
                 for move in stock_moves:
                     exp_key = move.product_id._get_product_accounts()['expense']
@@ -955,6 +957,7 @@ class PosSession(models.Model):
             'ref': _('Combine %s POS payments from %s', payment_method.name, self.name),
             'pos_payment_method_id': payment_method.id,
             'pos_session_id': self.id,
+            'company_id': self.company_id.id,
         })
 
         diff_amount_compare_to_zero = self.currency_id.compare_amounts(diff_amount, 0)
@@ -1606,6 +1609,7 @@ class PosSession(models.Model):
             'pos.order': self.env['pos.order'].search([('session_id', '=', self.id), ('state', '=', 'draft')]).export_for_ui()
         }
 
+
     def _load_model(self, model):
         model_name = model.replace('.', '_')
         loader = getattr(self, '_get_pos_ui_%s' % model_name, None)
@@ -1685,6 +1689,9 @@ class PosSession(models.Model):
         loaded_data['pos_has_valid_product'] = self._pos_has_valid_product()
         loaded_data['pos_special_products_ids'] = self.env['pos.config']._get_special_products().ids
         loaded_data['open_orders'] = self.env['pos.order'].search([('session_id', '=', self.id), ('state', '=', 'draft')]).export_for_ui()
+        loaded_data['partner_commercial_fields'] = self.env['res.partner']._commercial_fields()
+        loaded_data['show_product_images'] = self.env['ir.config_parameter'].sudo().get_param('point_of_sale.show_product_images', 'yes')
+        loaded_data['show_category_images'] = self.env['ir.config_parameter'].sudo().get_param('point_of_sale.show_category_images', 'yes')
 
     @api.model
     def _pos_ui_models_to_load(self):
@@ -2239,13 +2246,17 @@ class PosSession(models.Model):
     def _load_onboarding_data(self):
         convert.convert_file(self.env, 'point_of_sale', 'data/point_of_sale_onboarding.xml', None, mode='init', kind='data')
         shop_config = self.env.ref('point_of_sale.pos_config_main', raise_if_not_found=False)
-        if shop_config:
-            convert.convert_file(self.env, 'point_of_sale', 'data/point_of_sale_onboarding_main_config.xml', None, mode='init', kind='data')
-            if len(shop_config.session_ids.filtered(lambda s: s.state == 'opened')) == 0:
-                self.env['pos.session'].create({
-                    'config_id': shop_config.id,
-                    'user_id': self.env.ref('base.user_admin').id,
-                })
+        if shop_config and shop_config.active:
+            self._load_onboarding_main_config_data(shop_config)
+
+    @api.model
+    def _load_onboarding_main_config_data(self, shop_config):
+        convert.convert_file(self.env, 'point_of_sale', 'data/point_of_sale_onboarding_main_config.xml', None, mode='init', kind='data')
+        if len(shop_config.session_ids.filtered(lambda s: s.state == 'opened')) == 0:
+            self.env['pos.session'].create({
+                'config_id': shop_config.id,
+                'user_id': self.env.ref('base.user_admin').id,
+            })
 
     def _after_load_onboarding_data(self):
         config = self.env.ref('point_of_sale.pos_config_main', raise_if_not_found=False)

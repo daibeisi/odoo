@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import base64
-from pytz import UTC
+from pytz import timezone, UTC
 from datetime import datetime, time
 from random import choice
 from string import digits
@@ -175,7 +175,7 @@ class HrEmployeePrivate(models.Model):
                 continue
             avatar = employee._origin[image_field]
             if not avatar and employee.user_id:
-                avatar = employee.user_id[avatar_field]
+                avatar = employee.user_id.sudo()[avatar_field]
             employee[avatar_field] = avatar
         super(HrEmployeePrivate, self.browse(employee_wo_user_or_image_ids))._compute_avatar(avatar_field, image_field)
 
@@ -410,11 +410,11 @@ class HrEmployeePrivate(models.Model):
         if 'work_contact_id' in vals:
             account_ids = vals.get('bank_account_id') or self.bank_account_id.ids
             if account_ids:
-                bank_accounts = self.env['res.partner.bank'].browse(account_ids)
+                bank_accounts = self.env['res.partner.bank'].sudo().browse(account_ids)
                 for bank_account in bank_accounts:
                     if vals['work_contact_id'] != bank_account.partner_id.id:
                         if bank_account.allow_out_payment:
-                            bank_account.sudo().allow_out_payment = False
+                            bank_account.allow_out_payment = False
                         if vals['work_contact_id']:
                             bank_account.partner_id = vals['work_contact_id']
             self.message_unsubscribe(self.work_contact_id.ids)
@@ -516,7 +516,14 @@ class HrEmployeePrivate(models.Model):
 
     def _get_calendar_attendances(self, date_from, date_to):
         self.ensure_one()
-        return self.resource_calendar_id.get_work_duration_data(date_from, date_to)
+        employee_timezone = timezone(self.tz) if self.tz else None
+        calendar = self.resource_calendar_id or self.company_id.resource_calendar_id
+        return calendar\
+            .with_context(employee_timezone=employee_timezone)\
+            .get_work_duration_data(
+                date_from,
+                date_to,
+                domain=[('company_id', 'in', [False, self.company_id.id])])
 
     # ---------------------------------------------------------
     # Business Methods

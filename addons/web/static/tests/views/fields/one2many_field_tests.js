@@ -4443,7 +4443,7 @@ QUnit.module("Fields", (hooks) => {
         await clickSave(target);
         assert.containsNone(target, "tr.o_data_row");
 
-        assert.verifySteps(["get_views", "web_read", "onchange", "onchange", "web_save"]);
+        assert.verifySteps(["get_views", "web_read", "onchange", "onchange"]);
     });
 
     QUnit.test("discard O2M field with close button", async function (assert) {
@@ -11552,6 +11552,62 @@ QUnit.module("Fields", (hooks) => {
         }
     );
 
+    QUnit.test(
+        "reorder one2many with many2many_tags in list and list in form",
+        async function (assert) {
+            assert.expect(3);
+
+            serverData.models.partner.records[0].p = [2, 4];
+            serverData.models.partner.records[0].p = [1, 4];
+
+            serverData.views = {
+                "partner,false,form": `
+                <form>
+                    <field name="p">
+                        <tree editable="top">
+                            <field name="int_field" widget="handle"/>
+                            <field name="display_name"/>
+                        </tree>
+                    </field>
+                </form>`,
+            };
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                <form>
+                    <field name="p">
+                        <tree>
+                            <field name="display_name"/>
+                            <field name="p" widget="many2many_tags"/>
+                        </tree>
+                    </field>
+                </form>`,
+                resId: 1,
+            });
+
+            await click(target.querySelector(".o_data_cell"));
+            assert.containsOnce(target, ".modal");
+            assert.deepEqual(
+                [...target.querySelectorAll(".modal [name='display_name']")].map(
+                    (el) => el.textContent
+                ),
+
+                ["aaa", "first record"]
+            );
+
+            await dragAndDrop(".modal tr:nth-child(2) .o_handle_cell", "tbody tr", "top");
+            assert.deepEqual(
+                [...target.querySelectorAll(".modal [name='display_name']")].map(
+                    (el) => el.textContent
+                ),
+
+                ["first record", "aaa"]
+            );
+        }
+    );
+
     QUnit.test("nested one2many, onchange, no command value", async function (assert) {
         // This test ensures that we always send all values to onchange rpcs for nested
         // one2manys, even if some field hasn't changed. In this particular test case,
@@ -13157,7 +13213,7 @@ QUnit.module("Fields", (hooks) => {
         assert.containsNone(target, ".o_kanban_record:not(.o_kanban_ghost)");
 
         await clickSave(target);
-        assert.verifySteps(["web_save"]);
+        assert.verifySteps([]);
     });
 
     QUnit.test("toggle boolean in o2m with the formView in edition", async function (assert) {
@@ -14387,6 +14443,219 @@ QUnit.module("Fields", (hooks) => {
                 ".o_form_status_indicator_buttons:not(.invisible)",
                 "form view is dirty"
             );
+        }
+    );
+
+    QUnit.test(
+        "x2many kanban with float field in form (non inline) but not in kanban",
+        async function (assert) {
+            // In this test, the form view contains an extra float field and isn't inline. When we open
+            // a record, we add the form fields to the list of activeFields, and we load the
+            // corresponding data (for that record only). Afterwards, we force a re-rendering of the
+            // x2many kanban to ensure that the other record can still be rendered. Before the fix coming
+            // with this test, it wasn't the case, because those records had extra activeFields, but no
+            // entry in data for those fields.
+            serverData.models.partner.records[0].turtles = [2, 3];
+            serverData.views = {
+                "turtle,false,form": `
+                    <form>
+                        <field name="display_name"/>
+                        <field name="turtle_qux"/>
+                    </form>`,
+            };
+
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                <form>
+                    <field name="bar"/>
+                    <field name="turtles" invisible="not bar">
+                        <kanban>
+                            <field name="display_name"/>
+                            <templates>
+                                <t t-name="kanban-box">
+                                    <div class="oe_kanban_global_click">
+                                        <t t-esc="record.display_name.raw_value"/>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </form>`,
+                resId: 1,
+            });
+
+            assert.containsOnce(target, ".o_field_widget[name=turtles]");
+            assert.containsN(target, ".o_kanban_record:not(.o_kanban_ghost)", 2);
+
+            // open the first record
+            await click(target.querySelector(".o_kanban_record"));
+            assert.containsOnce(target, ".o_dialog");
+            assert.containsOnce(target, ".o_dialog .o_field_widget[name=turtle_qux]");
+
+            // close the dialog
+            await click(target.querySelector(".o_dialog .o_form_button_save"));
+            assert.containsNone(target, ".o_dialog");
+
+            // toggle bar to make the x2many invisible
+            await click(target, ".o_field_widget[name=bar] input");
+            assert.containsNone(target, ".o_field_widget[name=turtles]");
+
+            // toggle bar again to make the x2many visible and force kanban cards to re-render
+            await click(target, ".o_field_widget[name=bar] input");
+            assert.containsOnce(target, ".o_field_widget[name=turtles]");
+            assert.containsN(target, ".o_kanban_record:not(.o_kanban_ghost)", 2);
+        }
+    );
+
+    QUnit.test(
+        "onchange on x2many returning an update command with only readonly fields",
+        async function (assert) {
+            serverData.models.partner.records[0].turtles = [2];
+            serverData.models.turtle.fields.display_name.readonly = true;
+            serverData.models.partner.onchanges = {
+                bar: (obj) => {
+                    obj.turtles = [[1, 2, { display_name: "onchange name" }]];
+                },
+            };
+
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                    <form>
+                        <field name="bar"/>
+                        <field name="turtles">
+                            <tree><field name="display_name"/></tree>
+                        </field>
+                    </form>`,
+                mockRPC(route, args) {
+                    assert.step(args.method);
+                    if (args.method === "web_save") {
+                        assert.deepEqual(args.args[1], { bar: false }); // should not contain turtles
+                    }
+                },
+                resId: 1,
+            });
+
+            assert.containsOnce(target, ".o_field_widget[name=turtles] .o_data_row");
+            assert.strictEqual(target.querySelector(".o_data_cell").innerText, "donatello");
+
+            await click(target.querySelector(".o_field_widget[name=bar] input"));
+            assert.strictEqual(target.querySelector(".o_data_cell").innerText, "onchange name");
+
+            await clickSave(target);
+            assert.strictEqual(target.querySelector(".o_data_cell").innerText, "donatello");
+            assert.verifySteps(["get_views", "web_read", "onchange", "web_save"]);
+        }
+    );
+
+    QUnit.test(
+        "onchange on x2many returning a create command with only readonly fields",
+        async function (assert) {
+            serverData.models.turtle.fields.display_name.readonly = true;
+            serverData.models.partner.onchanges = {
+                bar: (obj) => {
+                    obj.turtles = [[0, false, { display_name: "onchange name" }]];
+                },
+            };
+
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                    <form>
+                        <field name="bar"/>
+                        <field name="turtles">
+                            <tree><field name="display_name"/></tree>
+                        </field>
+                    </form>`,
+                resId: 1,
+                mockRPC(route, args) {
+                    assert.step(args.method);
+                    if (args.method === "web_save") {
+                        assert.deepEqual(args.args[1], {
+                            bar: false,
+                            turtles: [[0, args.args[1].turtles[0][1], {}]],
+                        });
+                    }
+                },
+            });
+
+            assert.containsOnce(target, ".o_field_widget[name=turtles] .o_data_row");
+            assert.strictEqual(target.querySelector(".o_data_cell").innerText, "donatello");
+
+            await click(target.querySelector(".o_field_widget[name=bar] input"));
+            assert.containsN(target, ".o_field_widget[name=turtles] .o_data_row", 2);
+            assert.strictEqual(
+                target.querySelectorAll(".o_data_cell")[1].innerText,
+                "onchange name"
+            );
+
+            await clickSave(target);
+            assert.containsN(target, ".o_field_widget[name=turtles] .o_data_row", 2);
+            assert.verifySteps(["get_views", "web_read", "onchange", "web_save"]);
+        }
+    );
+
+    QUnit.test(
+        "onchange on x2many add and delete x2m record, returning to initial state",
+        async function (assert) {
+            serverData.models.turtle.fields.display_name.readonly = true;
+            serverData.models.partner.onchanges = {
+                turtles: function () {},
+            };
+
+            let onchangeCount = 0;
+            await makeView({
+                type: "form",
+                resModel: "partner",
+                serverData,
+                arch: `
+                    <form>
+                        <field name="turtles">
+                            <tree editable="bottom">
+                                <field name="display_name"/>
+                            </tree>
+                        </field>
+                    </form>`,
+                resId: 1,
+                mockRPC(route, args) {
+                    assert.step(args.method);
+                    if (args.method === "onchange") {
+                        if (onchangeCount === 1) {
+                            // partner turtles onchange for the new x2m record
+                            assert.strictEqual(args.model, 'partner');
+                            assert.deepEqual(Object.keys(args.args[1]), ["turtles"]);
+                            assert.strictEqual(args.args[1].turtles[0][0], 0);
+                            assert.deepEqual(args.args[2], ['turtles']);
+                        } else if (onchangeCount === 2) {
+                            // x2m record removed, empty list of commands expected
+                            assert.strictEqual(args.model, 'partner');
+                            assert.deepEqual(Object.keys(args.args[1]), ["turtles"]);
+                            assert.deepEqual(args.args[1].turtles, []);
+                            assert.deepEqual(args.args[2], ['turtles']);
+                        }
+                        onchangeCount++;
+                    }
+                },
+            });
+
+            assert.containsOnce(target, ".o_field_widget[name=turtles] .o_data_row");
+            assert.strictEqual(target.querySelector(".o_data_cell").innerText, "donatello");
+
+            await addRow(target);
+            assert.containsN(target, ".o_field_widget[name=turtles] .o_data_row", 2);
+            await removeRow(target, 1);
+            assert.containsN(target, ".o_field_widget[name=turtles] .o_data_row", 1);
+
+            await clickSave(target);
+            assert.containsN(target, ".o_field_widget[name=turtles] .o_data_row", 1);
+            assert.verifySteps(["get_views", "web_read", "onchange", "onchange", "onchange"]);
         }
     );
 });

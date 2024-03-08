@@ -178,20 +178,26 @@ patch(PosStore.prototype, {
                 const considerTheReward =
                     program.applies_on !== "both" || (program.applies_on == "both" && hasLine);
                 if (reward.reward_type === "product" && considerTheReward) {
-                    const product = this.db.get_product_by_id(reward.reward_product_ids[0]);
-                    const potentialQty = order._computePotentialFreeProductQty(
-                        reward,
-                        product,
-                        points
-                    );
-                    if (potentialQty <= 0) {
-                        continue;
+                    let hasPotentialQty = true;
+                    let potentialQty;
+                    for (const productId of reward.reward_product_ids) {
+                        const product = this.db.get_product_by_id(productId);
+                        potentialQty = order._computePotentialFreeProductQty(
+                            reward,
+                            product,
+                            points
+                        );
+                        if (potentialQty <= 0) {
+                            hasPotentialQty = false;
+                        }
                     }
-                    result.push({
-                        coupon_id: couponProgram.coupon_id,
-                        reward: reward,
-                        potentialQty,
-                    });
+                    if (hasPotentialQty) {
+                        result.push({
+                            coupon_id: couponProgram.coupon_id,
+                            reward: reward,
+                            potentialQty,
+                        });
+                    }
                 }
             }
         }
@@ -309,7 +315,7 @@ patch(PosStore.prototype, {
         const result = await this.env.services.orm.searchRead(
             "loyalty.card",
             domain,
-            ["id", "points", "code", "partner_id", "program_id"],
+            ["id", "points", "code", "partner_id", "program_id", "expiration_date"],
             { limit }
         );
         if (Object.keys(this.couponCache).length + result.length > COUPON_CACHE_MAX_SIZE) {
@@ -327,7 +333,8 @@ patch(PosStore.prototype, {
                 dbCoupon.id,
                 dbCoupon.program_id[0],
                 dbCoupon.partner_id[0],
-                dbCoupon.points
+                dbCoupon.points,
+                dbCoupon.expiration_date
             );
             this.couponCache[coupon.id] = coupon;
             this.partnerId2CouponIds[coupon.partner_id] =

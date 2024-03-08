@@ -8,16 +8,34 @@ from odoo.addons.sale.tests.test_sale_product_attribute_value_config import Test
 
 
 @tagged('post_install', '-at_install')
-class TestUi(TestSaleProductAttributeValueCommon, HttpCase):
+class WebsiteSaleLoyaltyTestUi(TestSaleProductAttributeValueCommon, HttpCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env.ref('base.user_admin').write({
+            'company_id': cls.env.company.id,
+            'company_ids': [(4, cls.env.company.id)],
+            'name': 'Mitchell Admin',
+            'street': '215 Vine St',
+            'phone': '+1 555-555-5555',
+            'city': 'Scranton',
+            'zip': '18503',
+            'country_id': cls.env.ref('base.us').id,
+            'state_id': cls.env.ref('base.state_us_39').id,
+        })
+        cls.env.ref('base.user_admin').sudo().partner_id.company_id = cls.env.company
+        cls.env.ref('website.default_website').company_id = cls.env.company
 
     def test_01_admin_shop_sale_loyalty_tour(self):
         if self.env['ir.module.module']._get('payment_custom').state != 'installed':
             self.skipTest("Transfer provider is not installed")
 
         transfer_provider = self.env.ref('payment.payment_provider_transfer')
-        transfer_provider.write({
+        transfer_provider.sudo().write({
             'state': 'enabled',
             'is_published': True,
+            'company_id': self.env.company.id,
         })
         transfer_provider._transfer_ensure_pending_msg_is_set()
 
@@ -88,6 +106,31 @@ class TestUi(TestSaleProductAttributeValueCommon, HttpCase):
                 'discount_applicability': 'order',
                 'discount_line_product_id': ten_percent.id,
             })],
+        })
+
+        vip_program = self.env['loyalty.program'].create({
+            'name': 'VIP',
+            'trigger': 'auto',
+            'program_type': 'loyalty',
+            'portal_visible': True,
+            'applies_on': 'both',
+            'rule_ids': [(0, 0, {
+                'mode': 'auto',
+            })],
+            'reward_ids': [(0, 0, {
+                'reward_type': 'discount',
+                'discount': 21,
+                'discount_mode': 'percent',
+                'discount_applicability': 'order',
+                'required_points': 50,
+            })],
+        })
+
+        self.env['loyalty.card'].create({
+            'partner_id': self.env.ref('base.partner_admin').id,
+            'program_id': vip_program.id,
+            'point_name': "Points",
+            'points': 371.03,
         })
 
         self.env.ref("website_sale.reduction_code").write({"active": True})
@@ -295,3 +338,31 @@ class TestWebsiteSaleCoupon(HttpCase):
             ],
         })
         self.start_tour('/', 'apply_discount_code_program_multi_rewards', login='admin')
+
+    def test_03_remove_coupon(self):
+        # 1. Simulate a frontend order (website, product)
+        order = self.empty_order
+        order.website_id = self.env['website'].browse(1)
+        self.env['sale.order.line'].create({
+            'product_id': self.env['product.product'].create({
+                'name': 'Product A', 'list_price': 100, 'sale_ok': True
+            }).id,
+            'name': 'Product A',
+            'order_id': order.id,
+        })
+
+        # 2. Apply the coupon
+        self._apply_promo_code(order, self.coupon.code)
+
+        # 3. Remove the coupon
+        coupon_line = order.website_order_line.filtered(
+            lambda l: l.coupon_id and l.coupon_id.id == self.coupon.id
+        )
+
+        kwargs = {
+            'line_id': None, 'product_id': coupon_line.product_id.id, 'add_qty': None, 'set_qty': 0
+        }
+        order._cart_update(**kwargs)
+
+        msg = "The coupon should've been removed from the order"
+        self.assertEqual(len(order.applied_coupon_ids), 0, msg=msg)

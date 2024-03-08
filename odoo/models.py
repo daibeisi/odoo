@@ -616,6 +616,13 @@ class BaseModel(metaclass=MetaModel):
     as attribute.
     """
 
+    _allow_sudo_commands = True
+    """Allow One2many and Many2many Commands targeting this model in an environment using `sudo()` or `with_user()`.
+    By disabling this flag, security-sensitive models protect themselves
+    against malicious manipulation of One2many or Many2many fields
+    through an environment using `sudo` or a more priviledged user.
+    """
+
     _depends = frozendict()
     """dependencies of models backed up by SQL views
     ``{model_name: field_names}``, where ``field_names`` is an iterable.
@@ -637,7 +644,7 @@ class BaseModel(metaclass=MetaModel):
     @api.model
     def _add_field(self, name, field):
         """ Add the given ``field`` under the given ``name`` in the class """
-        cls = type(self)
+        cls = self.env.registry[self._name]
 
         # Assert the name is an existing field in the model, or any model in the _inherits
         # or a custom field (starting by `x_`)
@@ -667,7 +674,7 @@ class BaseModel(metaclass=MetaModel):
         """ Remove the field with the given ``name`` from the model.
             This method should only be used for manual fields.
         """
-        cls = type(self)
+        cls = self.env.registry[self._name]
         field = cls._fields.pop(name, None)
         discardattr(cls, name)
         if cls._rec_name == name:
@@ -852,7 +859,7 @@ class BaseModel(metaclass=MetaModel):
                 return func(self)
             return wrapper
 
-        cls = type(self)
+        cls = self.env.registry[self._name]
         methods = []
         for attr, func in getmembers(cls, is_constraint):
             if callable(func._constrains):
@@ -875,7 +882,7 @@ class BaseModel(metaclass=MetaModel):
         def is_ondelete(func):
             return callable(func) and hasattr(func, '_ondelete')
 
-        cls = type(self)
+        cls = self.env.registry[self._name]
         methods = [func for _, func in getmembers(cls, is_ondelete)]
         # optimization: memoize results on cls, it will not be recomputed
         cls._ondelete_methods = methods
@@ -888,7 +895,7 @@ class BaseModel(metaclass=MetaModel):
             return callable(func) and hasattr(func, '_onchange')
 
         # collect onchange methods on the model's class
-        cls = type(self)
+        cls = self.env.registry[self._name]
         methods = defaultdict(list)
         for attr, func in getmembers(cls, is_onchange):
             missing = []
@@ -1102,7 +1109,7 @@ class BaseModel(metaclass=MetaModel):
             # collect all the tuples in "lines" (along with their coordinates)
             for i, line in enumerate(lines):
                 for j, cell in enumerate(line):
-                    if type(cell) is tuple:
+                    if isinstance(cell, tuple):
                         bymodels[cell[0]].add(cell[1])
                         xidmap[cell].append((i, j))
             # for each model, xid-export everything and inject in matrix
@@ -2196,7 +2203,7 @@ class BaseModel(metaclass=MetaModel):
         # columns should be displayed even if they don't contain any record.
         group_expand = field.group_expand
         if isinstance(group_expand, str):
-            group_expand = getattr(type(self), group_expand)
+            group_expand = getattr(self.env.registry[self._name], group_expand)
         assert callable(group_expand)
 
         # determine all groups that should be returned
@@ -2450,13 +2457,13 @@ class BaseModel(metaclass=MetaModel):
             for row in rows_dict:
                 value = row[group]
 
-                if field.type in ('many2one', 'many2many') and isinstance(value, BaseModel):
+                if isinstance(value, BaseModel):
                     row[group] = (value.id, value.sudo().display_name) if value else False
                     value = value.id
 
                 if not value and field.type == 'many2many':
                     other_values = [other_row[group][0] if isinstance(other_row[group], tuple)
-                                    else other_row[group].id if isinstance(value, BaseModel)
+                                    else other_row[group].id if isinstance(other_row[group], BaseModel)
                                     else other_row[group] for other_row in rows_dict if other_row[group]]
                     additional_domain = [(field_name, 'not in', other_values)]
                 else:
@@ -3253,13 +3260,13 @@ class BaseModel(metaclass=MetaModel):
                     field.required = True
                 if field.ondelete.lower() not in ('cascade', 'restrict'):
                     field.ondelete = 'cascade'
-                type(self)._inherits = {**self._inherits, field.comodel_name: field.name}
+                self.pool[self._name]._inherits = {**self._inherits, field.comodel_name: field.name}
                 self.pool[field.comodel_name]._inherits_children.add(self._name)
 
     @api.model
     def _prepare_setup(self):
         """ Prepare the setup of the model. """
-        cls = type(self)
+        cls = self.env.registry[self._name]
         cls._setup_done = False
 
         # changing base classes is costly, do it only when necessary
@@ -3273,7 +3280,7 @@ class BaseModel(metaclass=MetaModel):
     @api.model
     def _setup_base(self):
         """ Determine the inherited and custom fields of the model. """
-        cls = type(self)
+        cls = self.env.registry[self._name]
         if cls._setup_done:
             return
 
@@ -3358,7 +3365,7 @@ class BaseModel(metaclass=MetaModel):
     @api.model
     def _setup_fields(self):
         """ Setup the fields, except for recomputation triggers. """
-        cls = type(self)
+        cls = self.env.registry[self._name]
 
         # set up fields
         bad_fields = []
@@ -3381,7 +3388,7 @@ class BaseModel(metaclass=MetaModel):
     @api.model
     def _setup_complete(self):
         """ Setup recomputation triggers, and complete the model setup. """
-        cls = type(self)
+        cls = self.env.registry[self._name]
 
         # register constraints and onchange methods
         cls._init_constraints_onchanges()
@@ -3993,6 +4000,8 @@ class BaseModel(metaclass=MetaModel):
         :param companies: the allowed companies for the related record
         :type companies: BaseModel or list or tuple or int or unquote
         """
+        if not companies:
+            return [('company_id', '=', False)]
         return ['|', ('company_id', '=', False), ('company_id', 'in', to_company_ids(companies))]
 
     def _check_company(self, fnames=None):
@@ -4035,7 +4044,7 @@ class BaseModel(metaclass=MetaModel):
                 corecord = record.sudo()[name]
                 if corecord:
                     domain = corecord._check_company_domain(company)
-                    if domain and not corecord.filtered_domain(domain):
+                    if domain and not corecord.with_context(active_test=False).filtered_domain(domain):
                         inconsistencies.append((record, name, corecord))
             # The second part of the check (for property / company-dependent fields) verifies that the records
             # linked via those relation fields are compatible with the company that owns the property value, i.e.
@@ -4046,7 +4055,7 @@ class BaseModel(metaclass=MetaModel):
                 corecord = record.sudo()[name]
                 if corecord:
                     domain = corecord._check_company_domain(company)
-                    if domain and not corecord.filtered_domain(domain):
+                    if domain and not corecord.with_context(active_test=False).filtered_domain(domain):
                         inconsistencies.append((record, name, corecord))
 
         if inconsistencies:
@@ -5589,6 +5598,7 @@ class BaseModel(metaclass=MetaModel):
         self.flush_model([parent])
         for id in self.ids:
             current_id = id
+            seen_ids = {current_id}
             while current_id:
                 cr.execute(SQL(
                     "SELECT %s FROM %s WHERE id = %s",
@@ -5596,8 +5606,9 @@ class BaseModel(metaclass=MetaModel):
                 ))
                 result = cr.fetchone()
                 current_id = result[0] if result else None
-                if current_id == id:
+                if current_id in seen_ids:
                     return False
+                seen_ids.add(current_id)
         return True
 
     def _check_m2m_recursion(self, field_name):
@@ -5867,6 +5878,8 @@ class BaseModel(metaclass=MetaModel):
 
         """
         assert isinstance(flag, bool)
+        if flag == self.env.su:
+            return self
         return self.with_env(self.env(su=flag))
 
     def with_user(self, user):
@@ -5973,7 +5986,7 @@ class BaseModel(metaclass=MetaModel):
         cache = self.env.cache
         fields = self._fields
         try:
-            field_values = [(fields[name], value) for name, value in values.items()]
+            field_values = [(fields[name], value) for name, value in values.items() if name != 'id']
         except KeyError as e:
             raise ValueError("Invalid field %r on model %r" % (e.args[0], self._name))
 
@@ -5987,17 +6000,10 @@ class BaseModel(metaclass=MetaModel):
                 inv_recs = self[field.name].filtered(lambda r: not r.id)
                 if not inv_recs:
                     continue
+                # we need to adapt the value of the inverse fields to integrate self into it:
+                # x2many fields should add self, while many2one fields should replace with self
                 for invf in self.pool.field_inverses[field]:
-                    # DLE P98: `test_40_new_fields`
-                    # /home/dle/src/odoo/master-nochange-fp/odoo/addons/test_new_api/tests/test_new_fields.py
-                    # Be careful to not break `test_onchange_taxes_1`, `test_onchange_taxes_2`, `test_onchange_taxes_3`
-                    # If you attempt to find a better solution
-                    for inv_rec in inv_recs:
-                        if not cache.contains(inv_rec, invf):
-                            val = invf.convert_to_cache(self, inv_rec, validate=False)
-                            cache.set(inv_rec, invf, val)
-                        else:
-                            invf._update(inv_rec, self)
+                    invf._update(inv_recs, self)
 
     def _convert_to_record(self, values):
         """ Convert the ``values`` dictionary from the cache format to the
@@ -6581,7 +6587,7 @@ class BaseModel(metaclass=MetaModel):
         """
         if isinstance(key, str):
             # important: one must call the field's getter
-            return self._fields[key].__get__(self, type(self))
+            return self._fields[key].__get__(self, self.env.registry[self._name])
         elif isinstance(key, slice):
             return self.browse(self._ids[key])
         else:

@@ -4,6 +4,7 @@
 # 
 # Translators:
 # Wil Odoo, 2023
+# Pedro M. Baeza <pedro.baeza@tecnativa.com>, 2023
 # Larissa Manderfeld, 2023
 # 
 msgid ""
@@ -54,7 +55,7 @@ msgstr "Cambiar Cajero"
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_res_config_settings
 msgid "Config Settings"
-msgstr "Opciones de configuración"
+msgstr "Ajustes de configuración"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_hr_employee
@@ -87,15 +88,15 @@ msgstr "Empleados con acceso de gerente"
 #: model:ir.model.fields,help:pos_hr.field_pos_config__basic_employee_ids
 #: model:ir.model.fields,help:pos_hr.field_res_config_settings__pos_basic_employee_ids
 msgid "If left empty, all employees can log in to PoS"
-msgstr "Si se deja vacío, todos los empleados pueden acceder al PdV"
+msgstr "Si se deja vacío, todos los empleados pueden acceder al TPV"
 
 #. module: pos_hr
 #: model:ir.model.fields,help:pos_hr.field_pos_config__advanced_employee_ids
 #: model:ir.model.fields,help:pos_hr.field_res_config_settings__pos_advanced_employee_ids
 msgid "If left empty, only Odoo users have extended rights in PoS"
 msgstr ""
-"Si se deja vacío, solo los usuarios de Odoo tendrán derechos adicionales en "
-"el PdV"
+"Si se deja vacío, solo los usuarios de Odoo tendrán derechos extendidos en "
+"el TPV"
 
 #. module: pos_hr
 #. odoo-javascript

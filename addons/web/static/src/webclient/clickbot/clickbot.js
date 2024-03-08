@@ -14,6 +14,7 @@ const BLACKLISTED_MENUS = [
     "base.menu_third_party", // Open a new tab
     "event.menu_event_registration_desk", // there's no way to come back from this menu (tablet mode)
     "hr_attendance.menu_hr_attendance_kiosk_no_user_mode", // same here (tablet mode)
+    "mrp_workorder.menu_mrp_workorder_root", // same here (tablet mode)
     "account.menu_action_account_bank_journal_form", // Modal in an iFrame
 ];
 // If you change this selector, adapt Studio test "Studio icon matches the clickbot selector"
@@ -163,7 +164,7 @@ async function waitForCondition(stopCondition) {
  * Make sure the home menu is open (enterprise only)
  */
 async function ensureHomeMenu() {
-    const homeMenu = document.querySelector(".o_home_menu");
+    const homeMenu = document.querySelector("div.o_home_menu");
     if (!homeMenu) {
         let menuToggle = document.querySelector("nav.o_main_navbar > a.o_menu_toggle");
         if (!menuToggle) {
@@ -173,7 +174,7 @@ async function ensureHomeMenu() {
             menuToggle = document.querySelector(".o_stock_barcode_menu");
         }
         await triggerClick(menuToggle, "home menu toggle button");
-        await waitForCondition(() => document.querySelector(".o_home_menu"));
+        await waitForCondition(() => document.querySelector("div.o_home_menu"));
     }
 }
 

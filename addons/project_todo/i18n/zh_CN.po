@@ -6,6 +6,7 @@
 # Wil Odoo, 2023
 # 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023
 # Jeffery CHEN <jeffery9@gmail.com>, 2023
+# Chloe Wang, 2024
 # 
 msgid ""
 msgstr ""
@@ -13,7 +14,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-10-26 21:55+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Jeffery CHEN <jeffery9@gmail.com>, 2023\n"
+"Last-Translator: Chloe Wang, 2024\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/odoo/teams/41243/zh_CN/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -123,7 +124,7 @@ msgid ""
 "    </span>"
 msgstr ""
 "<span style=\"font-size: 14px;\">\n"
-"        在将待办转换为任务的过程中，您可以添加或删除受让人，以控制人员访问已创建任务的权限。请注意，任务是否可见，还取决于分配给它的项目的可见性设置。\n"
+"        在将待办转换为任务的过程中，您可以添加或删除受托人，以控制人员访问已创建任务的权限。请注意，任务是否可见，还取决于指派给它的项目的可见性设置。\n"
 "    </span>"
 
 #. module: project_todo
@@ -165,9 +166,9 @@ msgid ""
 "    </span>"
 msgstr ""
 "<span style=\"font-size: 14px;\">\n"
-"        待办和私人任务一样，只有指定为受让人的用户才能访问。您可以使用\n"
+"        待办和私人任务一样，只有指定为受托人的用户才能访问。您可以使用\n"
 "        <span style=\"font-weight: bolder;\">\n"
-"            <font class=\"text-o-color-2\">受让人</font>\n"
+"            <font class=\"text-o-color-2\">受托人</font>\n"
 "        </span>\n"
 "        字段与其他用户共享此待办。\n"
 "    </span>"
@@ -195,7 +196,7 @@ msgid ""
 "    </span>"
 msgstr ""
 "<span style=\"font-size: 14px;\">\n"
-"        您可以将待办转化为任务，并将其分配到项目中。 为此，您可以访问\n"
+"        您可以将待办转化为任务，并将其指派到项目中。 为此，您可以访问\n"
 "        <span style=\"font-weight: bolder;\">\n"
 "            <font class=\"text-o-color-2\">\"转换为任务\"</font>，\n"
 "        </span>\n"
@@ -256,12 +257,20 @@ msgstr "活动类型"
 #. module: project_todo
 #: model_terms:ir.ui.view,arch_db:project_todo.mail_activity_todo_create_popup
 msgid "Add To-Do"
-msgstr "添加待办"
+msgstr "添加待办事项"
+
+#. module: project_todo
+#. odoo-javascript
+#: code:addons/project_todo/static/src/web/activity/activity_menu_patch.js:0
+#: code:addons/project_todo/static/src/web/activity/activity_menu_patch.js:0
+#, python-format
+msgid "Add a To-Do"
+msgstr "添加待办事项"
 
 #. module: project_todo
 #: model_terms:ir.ui.view,arch_db:project_todo.mail_activity_todo_create_popup
 msgid "Add details about your to-do..."
-msgstr "添加待办的详细信息..."
+msgstr "添加待办事项详细信息..."
 
 #. module: project_todo
 #: model_terms:ir.ui.view,arch_db:project_todo.project_task_view_todo_form
@@ -272,7 +281,7 @@ msgstr "已存档"
 #. module: project_todo
 #: model:ir.model.fields,field_description:project_todo.field_mail_activity_todo_create__user_id
 msgid "Assigned to"
-msgstr "分配给"
+msgstr "指派给"
 
 #. module: project_todo
 #: model_terms:ir.ui.view,arch_db:project_todo.project_task_view_todo_form
@@ -382,7 +391,7 @@ msgid ""
 "                Your to-do items are private by default, but you can choose to share them with others by adding them as assignees."
 msgstr ""
 "使用备忘录和待办清单，让您的工作井井有条。\n"
-"                您的待办默认设置为私人可见，但您可以选择和他人共享，将他们添加为指派人即可。"
+"                您的待办默认设置为私人可见，但您可以选择和他人共享，将他们添加为受托人即可。"
 
 #. module: project_todo
 #: model:ir.model.fields,field_description:project_todo.field_mail_activity_todo_create__write_uid

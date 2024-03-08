@@ -7,7 +7,7 @@ import {sprintf} from "@web/core/utils/strings";
 import {WebsiteDialog} from './dialog';
 import {FormViewDialog} from "@web/views/view_dialogs/form_view_dialog";
 import { renderToFragment } from "@web/core/utils/render";
-import { Component, useEffect, useState, xml, useRef } from "@odoo/owl";
+import { Component, useEffect, useState, xml, useRef, onMounted } from "@odoo/owl";
 
 export class PageDependencies extends Component {
     setup() {
@@ -115,12 +115,19 @@ export class DuplicatePageDialog extends Component {
 
     async duplicate() {
         if (this.state.name) {
-            const res = await this.orm.call(
-                'website.page',
-                'clone_page',
-                [this.props.pageId, this.state.name]
-            );
-            this.website.goToWebsite({path: res, edition: true});
+            // TODO In master support only multiple pages.
+            const pageIds = this.props.pageIds ?? [this.props.pageId];
+            for (let count = 0; count < pageIds.length; count++) {
+                const name = this.state.name + (count ? ` ${count + 1}` : "");
+                const res = await this.orm.call(
+                    'website.page',
+                    'clone_page',
+                    [pageIds[count], name]
+                );
+                if (!this.props.pageIds) {
+                    this.website.goToWebsite({path: res, edition: true});
+                }
+            }
         }
         this.props.onDuplicate();
     }
@@ -139,9 +146,11 @@ DuplicatePageDialog.template = xml`
 </WebsiteDialog>
 `;
 DuplicatePageDialog.props = {
-    onDuplicate: {type: Function, optional: true},
+    onDuplicate: Function,
     close: Function,
     pageId: Number,
+    // If pageIds is defined, pageId is ignored.
+    pageIds: { type: Array, element: Number, optional: true },
 };
 
 export class PagePropertiesDialog extends FormViewDialog {
@@ -152,6 +161,14 @@ export class PagePropertiesDialog extends FormViewDialog {
         this.website = useService('website');
 
         this.viewProps.resId = this.resId;
+
+        // TODO: Remove in master, the `w-100` is causing a button's
+        // misalignment on the page properties dialog, this should be
+        // replaced by adding extra buttons to the default container in
+        // `this.viewProps.buttonTemplate`.
+        onMounted(() => {
+            this.modalRef.el?.querySelector(".modal-footer .o_cp_buttons")?.classList.remove("w-100");
+        });
     }
 
     get resId() {

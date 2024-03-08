@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
 from odoo import Command
+
 from odoo.api import Environment
 from odoo.tools import DEFAULT_SERVER_DATE_FORMAT
+from odoo.tests import loaded_demo_data, tagged
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 from odoo.addons.point_of_sale.tests.common_setup_methods import setup_pos_combo_items
 from datetime import date, timedelta
 from odoo.addons.point_of_sale.tests.common import archive_products
 
-import odoo.tests
+_logger = logging.getLogger(__name__)
 
 
 class TestPointOfSaleHttpCommon(AccountTestInvoicingHttpCommon):
@@ -45,7 +48,6 @@ class TestPointOfSaleHttpCommon(AccountTestInvoicingHttpCommon):
             'groups_id': [
                 (4, cls.env.ref('base.group_user').id),
                 (4, cls.env.ref('point_of_sale.group_pos_user').id),
-                (4, cls.env.ref('account.group_account_invoice').id),
             ],
         })
         cls.pos_admin = cls.env['res.users'].create({
@@ -515,9 +517,12 @@ class TestPointOfSaleHttpCommon(AccountTestInvoicingHttpCommon):
         env['ir.property']._set_default("property_product_pricelist", "res.partner", public_pricelist, main_company)
 
 
-@odoo.tests.tagged('post_install', '-at_install')
+@tagged('post_install', '-at_install')
 class TestUi(TestPointOfSaleHttpCommon):
     def test_01_pos_basic_order(self):
+        if not loaded_demo_data(self.env):
+            _logger.warning("This test relies on demo data. To be rewritten independently of demo data for accurate and reliable results.")
+            return
 
         self.main_pos_config.write({
             'iface_tipproduct': True,
@@ -547,6 +552,9 @@ class TestUi(TestPointOfSaleHttpCommon):
         self.assertEqual(email_count, 1)
 
     def test_02_pos_with_invoiced(self):
+        if not loaded_demo_data(self.env):
+            _logger.warning("This test relies on demo data. To be rewritten independently of demo data for accurate and reliable results.")
+            return
         self.pos_user.write({
             'groups_id': [
                 (4, self.env.ref('account.group_account_invoice').id),
@@ -561,11 +569,13 @@ class TestUi(TestPointOfSaleHttpCommon):
         self.assertEqual(n_paid, 2, 'There should be 2 paid order.')
 
     def test_04_product_configurator(self):
-
         self.main_pos_config.with_user(self.pos_user).open_ui()
         self.start_tour("/pos/ui?config_id=%d" % self.main_pos_config, 'ProductConfiguratorTour', login="pos_user")
 
     def test_05_ticket_screen(self):
+        if not loaded_demo_data(self.env):
+            _logger.warning("This test relies on demo data. To be rewritten independently of demo data for accurate and reliable results.")
+            return
         self.pos_user.write({
             'groups_id': [
                 (4, self.env.ref('account.group_account_invoice').id),
@@ -722,6 +732,7 @@ class TestUi(TestPointOfSaleHttpCommon):
         self.start_tour("/pos/ui?config_id=%d" % self.main_pos_config.id, 'PaymentScreenRoundingHalfUp', login="pos_user")
 
     def test_rounding_half_up_cash_and_bank(self):
+        self.env['res.partner'].create({'name': 'Nicole Ford'})
         company = self.main_pos_config.company_id
         rouding_method = self.env['account.cash.rounding'].create({
             'name': 'Rounding HALF-UP',
@@ -1095,6 +1106,36 @@ class TestUi(TestPointOfSaleHttpCommon):
 
         self.main_pos_config.open_ui()
         self.start_tour("/pos/ui?config_id=%d" % self.main_pos_config.id, 'limitedProductPricelistLoading', login="accountman")
+
+    def test_multi_product_options(self):
+        product_a = self.env['product.product'].create({
+            'name': 'Product A',
+            'available_in_pos': True,
+            'list_price': 10,
+            'taxes_id': False,
+        })
+
+        chair_multi_attribute = self.env['product.attribute'].create({
+            'name': 'Multi',
+            'display_type': 'multi',
+            'create_variant': 'no_variant',
+        })
+        chair_multi_value_1 = self.env['product.attribute.value'].create({
+            'name': 'Value 1',
+            'attribute_id': chair_multi_attribute.id,
+        })
+        chair_multi_value_2 = self.env['product.attribute.value'].create({
+            'name': 'Value 2',
+            'attribute_id': chair_multi_attribute.id,
+        })
+        self.chair_multi_line = self.env['product.template.attribute.line'].create({
+            'product_tmpl_id': product_a.product_tmpl_id.id,
+            'attribute_id': chair_multi_attribute.id,
+            'value_ids': [(6, 0, [chair_multi_value_1.id, chair_multi_value_2.id])]
+        })
+
+        self.main_pos_config.with_user(self.pos_user).open_ui()
+        self.start_tour("/pos/ui?config_id=%d" % self.main_pos_config.id, 'MultiProductOptionsTour', login="pos_user")
 
 # This class just runs the same tests as above but with mobile emulation
 class MobileTestUi(TestUi):

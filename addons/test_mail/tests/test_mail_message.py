@@ -64,7 +64,7 @@ class TestMessageValues(MailCommon):
         self.assertFalse(message.sudo().tracking_value_ids)
 
         # Reset body case
-        record._message_update_content(message, '<p><br /></p>', attachment_ids=message.attachment_ids.ids)
+        record._message_update_content(message, Markup('<p><br /></p>'), attachment_ids=message.attachment_ids.ids)
         self.assertTrue(is_html_empty(message.body))
         self.assertFalse(message.sudo()._filter_empty(), 'Still having attachments')
 
@@ -161,6 +161,7 @@ class TestMessageValues(MailCommon):
                          'Reply-To: use only email when formataddr > 78 chars')
 
         # name + company_name would make it blow up: keep record_name in formatting
+        self.company_admin.name = "Company name being about 33 chars"
         test_record.write({'name': 'Name that would be more than 78 with company name'})
         msg = self.env['mail.message'].create({
             'model': test_record._name,

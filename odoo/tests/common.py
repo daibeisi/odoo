@@ -188,6 +188,8 @@ def new_test_user(env, login='', groups='base.group_user', context=None, **kwarg
 
     return env['res.users'].with_context(**context).create(create_values)
 
+def loaded_demo_data(env):
+    return bool(env.ref('base.user_demo', raise_if_not_found=False))
 
 class RecordCapturer:
     def __init__(self, model, domain):
@@ -956,6 +958,7 @@ class ChromeBrowser:
         if hasattr(self, 'ws'):
             self._websocket_send('Page.stopScreencast')
             if self.screencasts_dir and os.path.isdir(self.screencasts_frames_dir):
+                self.screencasts_dir = None
                 shutil.rmtree(self.screencasts_frames_dir)
 
             self._websocket_request('Page.stopLoading')
@@ -1160,6 +1163,8 @@ class ChromeBrowser:
         while True: # or maybe until `self._result` is `done()`?
             try:
                 msg = self.ws.recv()
+                if not msg:
+                    continue
                 self._logger.debug('\n<- %s', msg)
             except websocket.WebSocketTimeoutException:
                 continue
@@ -1187,6 +1192,9 @@ class ChromeBrowser:
                         else:
                             f.set_exception(ChromeBrowserException(res['error']['message']))
             except Exception:
+                msg = str(msg)
+                if msg and len(msg) > 500:
+                    msg = msg[:500] + '...'
                 _logger.exception("While processing message %s", msg)
 
     def _websocket_request(self, method, *, params=None, timeout=10.0):
@@ -1338,13 +1346,18 @@ which leads to stray network requests and inconsistencies."""
 
     def _handle_screencast_frame(self, sessionId, data, metadata):
         self._websocket_send('Page.screencastFrameAck', params={'sessionId': sessionId})
+        if not self.screencasts_dir:
+            return
         outfile = os.path.join(self.screencasts_frames_dir, 'frame_%05d.b64' % len(self.screencast_frames))
-        with open(outfile, 'w') as f:
-            f.write(data)
-            self.screencast_frames.append({
-                'file_path': outfile,
-                'timestamp': metadata.get('timestamp')
-            })
+        try:
+            with open(outfile, 'w') as f:
+                f.write(data)
+                self.screencast_frames.append({
+                    'file_path': outfile,
+                    'timestamp': metadata.get('timestamp')
+                })
+        except FileNotFoundError:
+            self._logger.debug('Useless screencast frame skipped: %s', outfile)
 
     _TO_LEVEL = {
         'debug': logging.DEBUG,

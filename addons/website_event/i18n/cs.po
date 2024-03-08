@@ -5,17 +5,17 @@
 # Translators:
 # Ivana Bartonkova, 2023
 # Jiří Podhorecký, 2023
-# Wil Odoo, 2023
-# Jakub Smolka, 2023
 # Aleš Fiala <f.ales1@seznam.cz>, 2023
+# Wil Odoo, 2024
+# Jakub Smolka, 2024
 # 
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 17.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
+"POT-Creation-Date: 2024-01-29 10:44+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Aleš Fiala <f.ales1@seznam.cz>, 2023\n"
+"Last-Translator: Jakub Smolka, 2024\n"
 "Language-Team: Czech (https://app.transifex.com/odoo/teams/41243/cs/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -456,6 +456,7 @@ msgid "Consumers"
 msgstr "Spotřebitelé"
 
 #. module: website_event
+#: model_terms:ir.ui.view,arch_db:website_event.event_location
 #: model_terms:ir.ui.view,arch_db:website_event.snippet_options
 msgid "Countries"
 msgstr "Země"
@@ -482,7 +483,7 @@ msgid "Created on"
 msgstr "Vytvořeno dne"
 
 #. module: website_event
-#: model_terms:ir.ui.view,arch_db:website_event.index_topbar
+#: model_terms:ir.ui.view,arch_db:website_event.event_time
 #: model_terms:ir.ui.view,arch_db:website_event.snippet_options
 msgid "Date"
 msgstr "Datum"
@@ -704,6 +705,16 @@ msgstr "Vypršelo"
 #: model:ir.model.fields,field_description:website_event.field_event_type__menu_register_cta
 #: model_terms:ir.ui.view,arch_db:website_event.event_event_view_form
 msgid "Extra Register Button"
+msgstr ""
+
+#. module: website_event
+#: model_terms:ir.ui.view,arch_db:website_event.event_location
+msgid "Filter by Country"
+msgstr "Filtrovat podle země"
+
+#. module: website_event
+#: model_terms:ir.ui.view,arch_db:website_event.event_time
+msgid "Filter by Date"
 msgstr ""
 
 #. module: website_event
@@ -966,7 +977,7 @@ msgstr "Další události"
 #. module: website_event
 #: model_terms:ir.actions.act_window,help:website_event.action_event_registration_report
 msgid "No Answers yet!"
-msgstr ""
+msgstr "Zatím bez odpovědí!"
 
 #. module: website_event
 #: model_terms:ir.actions.act_window,help:website_event.website_event_menu_action
@@ -1002,6 +1013,11 @@ msgstr "Není zveřejněno"
 #: model_terms:ir.ui.view,arch_db:website_event.event_event_view_form
 #: model_terms:ir.ui.view,arch_db:website_event.event_type_view_form
 msgid "Once per Order"
+msgstr ""
+
+#. module: website_event
+#: model_terms:ir.ui.view,arch_db:website_event.event_location
+msgid "Online Events"
 msgstr ""
 
 #. module: website_event
@@ -1076,8 +1092,8 @@ msgstr "Typ otázky"
 #. odoo-python
 #: code:addons/website_event/models/event_question.py:0
 #, python-format
-msgid "Question cannot belong to both the event category and itself."
-msgstr "Otázka nemůže patřit jak do kategorie události, tak do vlastní."
+msgid "Question cannot be linked to both an Event and an Event Type."
+msgstr ""
 
 #. module: website_event
 #: model:ir.model.fields,field_description:website_event.field_event_event__question_ids
@@ -1106,8 +1122,8 @@ msgid "Ref:"
 msgstr "Ref:"
 
 #. module: website_event
-#. odoo-python
 #. odoo-javascript
+#. odoo-python
 #: code:addons/website_event/models/event_event.py:0
 #: code:addons/website_event/static/src/js/register_toaster_widget.js:0
 #: model:ir.model.fields.selection,name:website_event.selection__website_event_menu__menu_type__register
@@ -1644,11 +1660,6 @@ msgid ""
 msgstr ""
 
 #. module: website_event
-#: model_terms:ir.ui.view,arch_db:website_event.registration_template
-msgid "alert-link my-3"
-msgstr ""
-
-#. module: website_event
 #: model_terms:ir.ui.view,arch_db:website_event.modal_ticket_registration
 msgid "available)"
 msgstr "k dispozici)"
@@ -1668,8 +1679,3 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:website_event.event_description_full
 msgid "iCal/Outlook"
 msgstr "iCal/Outlook"
-
-#. module: website_event
-#: model_terms:ir.ui.view,arch_db:website_event.registration_template
-msgid "ms-2"
-msgstr ""

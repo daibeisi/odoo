@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-import { random5Chars, uuidv4, qrCodeSrc, constructFullProductName } from "@point_of_sale/utils";
+import { constructFullProductName, random5Chars, uuidv4, qrCodeSrc } from "@point_of_sale/utils";
 // FIXME POSREF - unify use of native parseFloat and web's parseFloat. We probably don't need the native version.
 import { parseFloat as oParseFloat } from "@web/views/fields/parsers";
 import {
@@ -506,7 +506,7 @@ export class Orderline extends PosModel {
      *    @param {Object} modifiedPackLotLines key-value pair of String (the cid) & String (the new lot_name)
      *    @param {Array} newPackLotLines array of { lot_name: String }
      */
-    setPackLotLines({ modifiedPackLotLines, newPackLotLines , setQuantity = true }) {
+    setPackLotLines({ modifiedPackLotLines, newPackLotLines, setQuantity = true }) {
         // Set the new values for modified lot lines.
         const lotLinesToRemove = [];
         for (const lotLine of this.pack_lot_lines) {
@@ -574,11 +574,7 @@ export class Orderline extends PosModel {
         this.price_extra = parseFloat(price_extra) || 0.0;
     }
     set_full_product_name() {
-        this.full_product_name = constructFullProductName(
-            this,
-            this.pos.db.attribute_value_by_id,
-            this.product.display_name
-        );
+        this.full_product_name = this.product.display_name;
     }
     get_price_extra() {
         return this.price_extra;
@@ -714,6 +710,23 @@ export class Orderline extends PosModel {
     get_full_product_name() {
         return this.full_product_name || this.product.display_name;
     }
+    /**
+     * Return the full product name with variant details.
+     * 
+     * e.g. Desk Organiser product with variant:
+     * - Size: S
+     * - Fabric: Plastic
+     * 
+     * -> "Desk Organiser (S, Plastic)"
+     * @returns {string}
+     */
+    get_full_product_name_with_variant() {
+        return constructFullProductName(
+            this,
+            this.pos.db.attribute_value_by_id,
+            this.product.display_name
+        );
+    }
     // selects or deselects this orderline
     set_selected(selected) {
         this.selected = selected;
@@ -738,7 +751,10 @@ export class Orderline extends PosModel {
             orderline.compute_fixed_price(order_line_price),
             this.pos.currency.decimal_places
         );
-        // only orderlines of the same product can be merged
+        let hasSameAttributes = Object.keys(Object(orderline.attribute_value_ids)).length === Object.keys(Object(this.attribute_value_ids)).length;
+        if(hasSameAttributes && Object(orderline.attribute_value_ids)?.length && Object(this.attribute_value_ids)?.length) {
+            hasSameAttributes = orderline.attribute_value_ids.every((value, index) => value === this.attribute_value_ids[index]);
+        }
         return (
             !this.skipChange &&
             orderline.getNote() === this.getNote() &&
@@ -759,7 +775,8 @@ export class Orderline extends PosModel {
             orderline.get_customer_note() === this.get_customer_note() &&
             !this.refunded_orderline_id &&
             !this.isPartOfCombo() &&
-            !orderline.isPartOfCombo()
+            !orderline.isPartOfCombo() &&
+            hasSameAttributes
         );
     }
     is_pos_groupable() {
@@ -1076,6 +1093,26 @@ export class Orderline extends PosModel {
     isPartOfCombo() {
         return Boolean(this.comboParent || this.comboLines?.length);
     }
+    findAttribute(values) {
+        const listOfAttributes = [];
+        Object.values(this.pos.attributes_by_ptal_id).filter(
+            (attribute) => {
+                const attFound = attribute.values.filter((target) => {
+                    return Object.values(values).includes(target.id);
+                });
+                if (attFound.length > 0) {
+                    const modifiedAttribute = {
+                        ...attribute,
+                        valuesForOrderLine: attFound,
+                    };
+                    listOfAttributes.push(modifiedAttribute);
+                    return true;
+                }
+                return false;
+            }
+        );
+        return listOfAttributes;
+    }
     getDisplayData() {
         return {
             productName: this.get_full_product_name(),
@@ -1092,7 +1129,12 @@ export class Orderline extends PosModel {
             internalNote: this.getNote(),
             comboParent: this.comboParent?.get_full_product_name(),
             pack_lot_lines: this.get_lot_lines(),
-            price_without_discount: this.env.utils.formatCurrency(this.getUnitDisplayPriceBeforeDiscount()),
+            price_without_discount: this.env.utils.formatCurrency(
+                this.getUnitDisplayPriceBeforeDiscount()
+            ),
+            attributes: this.attribute_value_ids
+                ? this.findAttribute(this.attribute_value_ids)
+                : [],
         };
     }
 }
@@ -1536,10 +1578,13 @@ export class Order extends PosModel {
             date: this.receiptDate,
             pos_qr_code:
                 this.pos.company.point_of_sale_use_ticket_qr_code &&
+                this.finalized &&
                 qrCodeSrc(
                     `${this.pos.base_url}/pos/ticket/validate?access_token=${this.access_token}`
                 ),
-            ticket_code: this.pos.company.point_of_sale_ticket_unique_code && this.ticketCode,
+            ticket_code: this.pos.company.point_of_sale_ticket_unique_code &&
+                this.finalized &&
+                this.ticketCode,
             base_url: this.pos.base_url,
             footer: this.pos.config.receipt_footer,
             // FIXME: isn't there a better way to handle this date?
@@ -1625,7 +1670,7 @@ export class Order extends PosModel {
                         attribute_value_ids: line.attribute_value_ids,
                         line_uuid: line.uuid,
                         product_id: line.get_product().id,
-                        name: line.get_full_product_name(),
+                        name: line.get_full_product_name_with_variant(),
                         note: note,
                         quantity: line.get_quantity(),
                     };
@@ -1674,7 +1719,7 @@ export class Order extends PosModel {
 
                 if (quantityDiff && orderline.skipChange === skipped) {
                     changes[lineKey] = {
-                        name: orderline.get_full_product_name(),
+                        name: orderline.get_full_product_name_with_variant(),
                         product_id: product.id,
                         attribute_value_ids: orderline.attribute_value_ids,
                         quantity: quantityDiff,
@@ -1752,8 +1797,11 @@ export class Order extends PosModel {
     hasChangesToPrint() {
         return this.getOrderChanges().count ? true : false;
     }
+    canPay() {
+        return this.orderlines.length;
+    }
     async pay() {
-        if (!this.orderlines.length) {
+        if (!this.canPay()) {
             return;
         }
         if (
@@ -1781,6 +1829,9 @@ export class Order extends PosModel {
     }
     is_empty() {
         return this.orderlines.length === 0;
+    }
+    get isBooked() {
+        return this.booked || !this.is_empty() || this.server_id;
     }
     generate_unique_id() {
         // Generates a public identification number for the order.
@@ -2067,7 +2118,10 @@ export class Order extends PosModel {
         }
 
         if (options.draftPackLotLines) {
-            this.selected_orderline.setPackLotLines({ ...options.draftPackLotLines, setQuantity: options.quantity === undefined });
+            this.selected_orderline.setPackLotLines({
+                ...options.draftPackLotLines,
+                setQuantity: options.quantity === undefined,
+            });
         }
 
         if (options.comboLines?.length) {

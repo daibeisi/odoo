@@ -967,9 +967,18 @@ export class Rtc {
         );
         this.state.channel.rtcInvitingSession = undefined;
         await this.loadSfuClient();
+        if (!this.state.channel?.id) {
+            return;
+        }
         await this.call();
+        if (!this.state.channel?.id) {
+            return;
+        }
         this.soundEffectsService.play("channel-join");
         await this.resetAudioTrack({ force: true });
+        if (!this.state.channel?.id) {
+            return;
+        }
         if (video) {
             await this.toggleVideo("camera");
         }
@@ -1283,7 +1292,7 @@ export class Rtc {
      * @param {boolean} [force]
      */
     async toggleVideo(type, force) {
-        if (!this.state.channel.id) {
+        if (!this.state.channel?.id) {
             return;
         }
         switch (type) {
@@ -1494,6 +1503,9 @@ export class Rtc {
      * negotiationneeded -> offer -> answer -> ...
      */
     async updateRemote(session, trackKind) {
+        if (!session.peerConnection) {
+            return;
+        }
         this.log(session, `updating ${trackKind} transceiver`);
         let track;
         switch (trackKind) {

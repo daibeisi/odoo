@@ -4,6 +4,7 @@ from odoo import Command
 from odoo.addons.account.models.chart_template import AccountChartTemplate
 from odoo.addons.account.models.chart_template import TEMPLATE_MODELS
 from odoo.addons.account.tests.common import instantiate_accountman
+from odoo.exceptions import UserError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
@@ -47,7 +48,7 @@ def test_get_data(self, template_code):
             }
         },
         'account.tax': {
-            xmlid: _tax_vals(name, amount)
+            xmlid: _tax_vals(name, amount, 'account.account_tax_tag_1')
             for name, xmlid, amount in [
                 ('Tax 1', 'test_tax_1_template', 15),
                 ('Tax 2', 'test_tax_2_template', 0),
@@ -98,7 +99,8 @@ def test_get_data(self, template_code):
         }
     }
 
-def _tax_vals(name, amount, children_tax_xmlids=None, active=True):
+def _tax_vals(name, amount, tax_tag_id=None, children_tax_xmlids=None, active=True):
+    tag_command = [Command.set([tax_tag_id])] if tax_tag_id else None
     tax_vals = {
         'name': name,
         'amount': amount,
@@ -108,6 +110,13 @@ def _tax_vals(name, amount, children_tax_xmlids=None, active=True):
     }
     if children_tax_xmlids:
         tax_vals.update({'children_tax_ids': [Command.set(children_tax_xmlids)]})
+    else:
+        tax_vals.update({'repartition_line_ids': [
+            Command.create({'document_type': 'invoice', 'factor_percent': 100, 'repartition_type': 'base', 'tag_ids': tag_command}),
+            Command.create({'document_type': 'invoice', 'factor_percent': 100, 'repartition_type': 'tax'}),
+            Command.create({'document_type': 'refund', 'factor_percent': 100, 'repartition_type': 'base'}),
+            Command.create({'document_type': 'refund', 'factor_percent': 100, 'repartition_type': 'tax'}),
+        ]})
     return tax_vals
 
 
@@ -199,6 +208,38 @@ class TestChartTemplate(TransactionCase):
             })
         )
 
+    def test_inactive_tag_tax(self):
+        inactive_tag = self.env['account.account.tag'].create({
+            'name': 'Inactive Tax Tag',
+            'applicability': 'taxes',
+            'active': False,
+        })
+        tax_to_load = {
+            'name': 'Inactive Tags Tax',
+            'amount': 30,
+            'amount_type': 'percent',
+            'tax_group_id': 'tax_group_taxes',
+            'active': True,
+            'repartition_line_ids': [
+                Command.create({
+                    'document_type': 'invoice',
+                    'factor_percent': 100,
+                    'repartition_type': 'base',
+                    'tag_ids': inactive_tag.name,
+                }),
+            ]
+        }
+        self.env['account.chart.template']._deref_account_tags('test', {'tax1': tax_to_load})
+        self.assertEqual(
+            tax_to_load['repartition_line_ids'][0],
+            Command.create({
+                'document_type': 'invoice',
+                'factor_percent': 100,
+                'repartition_type': 'base',
+                'tag_ids': [(Command.set([inactive_tag.id]))],
+            }),
+        )
+
     def test_update_taxes_creation(self):
         """ Tests that adding a new tax and a fiscal position tax creates new records when updating. """
         def local_get_data(self, template_code):
@@ -252,9 +293,6 @@ class TestChartTemplate(TransactionCase):
             data['account.account.tag']['account.account_tax_tag_1']['name'] += ' [DUP]'
             return data
 
-        tax_existing = self.env['account.tax'].search([('company_id', '=', self.company_1.id), ('name', '=', 'Tax 1')])
-        tag_existing = self.env['account.account.tag'].search([('name', '=', 'tax_tag_name_1')])
-        tax_existing.invoice_repartition_line_ids.tag_ids = tag_existing
         with patch.object(AccountChartTemplate, '_get_chart_template_data', side_effect=local_get_data, autospec=True):
             self.env['account.chart.template'].try_loading('test', company=self.company_1, install_demo=False)
 
@@ -462,3 +500,47 @@ class TestChartTemplate(TransactionCase):
         for model in TEMPLATE_MODELS + sub_models:
             data_after = self.env[model].search(get_domain(model))
             self.assertEqual(data_before[model], data_after)
+
+    def test_unknown_company_fields(self):
+        """ Tests that if a key is not known in the company template data when the
+        context value 'l10n_check_fields_complete' is set, an error is raised. If a
+        key is not known in the company template data but the context value is not
+        set, that key is skipped and no error is raised."""
+
+        def local_get_data(self, template_code):
+            data = test_get_data(self, template_code)
+            data['res.company'][company.id]['unknown_company_key'] = 'unknown_company_value'
+            return data
+
+        company = self.company_1
+
+        with patch.object(AccountChartTemplate, '_get_chart_template_data', side_effect=local_get_data, autospec=True):
+            # hard fail the loading if the context key is set to ensure `test_all_l10n` works as expected
+            with (
+                self.assertRaisesRegex(ValueError, 'unknown_company_key'),
+                self.env.cr.savepoint(),
+            ):
+                self.env['account.chart.template'].with_context(l10n_check_fields_complete=True).try_loading('test', company=company, install_demo=False)
+
+            # silently ignore if the field doesn't exist (yet)
+            self.env['account.chart.template'].try_loading('test', company=company, install_demo=False)
+
+    def test_update_tax_with_non_existent_tag(self):
+        """ Tests that when we update the CoA with a tax that has a tag that does not exist yet we raise an error.
+        Typical use case is when the code got updated but the module haven't been updated (-u).
+        """
+        tax_to_load = {
+            'name': 'Mixed Tags Tax',
+            'amount': 30,
+            'amount_type': 'percent',
+            'tax_group_id': 'tax_group_taxes',
+            'active': True,
+            'repartition_line_ids': [
+                Command.create({'document_type': 'invoice', 'factor_percent': 100, 'repartition_type': 'base', 'tag_ids': '+SIGNED_TAG'}),
+                Command.create({'document_type': 'invoice', 'factor_percent': 100, 'repartition_type': 'tax'}),
+                Command.create({'document_type': 'refund', 'factor_percent': 100, 'repartition_type': 'base'}),
+                Command.create({'document_type': 'refund', 'factor_percent': 100, 'repartition_type': 'tax'}),
+            ]
+        }
+        with self.assertRaisesRegex(UserError, 'update your localization'):
+            self.env['account.chart.template']._deref_account_tags('test', {'tax1': tax_to_load})

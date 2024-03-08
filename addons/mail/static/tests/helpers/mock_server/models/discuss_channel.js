@@ -204,18 +204,13 @@ patch(MockServer.prototype, {
     _mockDiscussChannelMessagePost(id, kwargs, context) {
         const message_type = kwargs.message_type || "notification";
         const channel = this.getRecords("discuss.channel", [["id", "=", id]])[0];
-        if (channel.channel_type !== "channel") {
-            const memberOfCurrentUser = this._mockDiscussChannelMember__getAsSudoFromContext(
-                channel.id
-            );
-            if (memberOfCurrentUser) {
-                this.pyEnv["discuss.channel.member"].write([memberOfCurrentUser.id], {
-                    last_interest_dt: serializeDateTime(today()),
-
-                    is_pinned: true,
-                });
-            }
-        }
+        const members = this.pyEnv["discuss.channel.member"].search([
+            ["channel_id", "=", channel.id],
+        ]);
+        this.pyEnv["discuss.channel.member"].write(members, {
+            last_interest_dt: serializeDateTime(today()),
+            is_pinned: true,
+        });
         const messageData = this._mockMailThreadMessagePost(
             "discuss.channel",
             [id],
@@ -273,19 +268,11 @@ patch(MockServer.prototype, {
                 model: "discuss.channel",
             },
         });
-
-        /**
-         * Leave message not posted here because it would send the new message
-         * notification on a separate bus notification list from the unsubscribe
-         * itself which would lead to the channel being pinned again (handler
-         * for unsubscribe is weak and is relying on both of them to be sent
-         * together on the bus).
-         */
-        // this._mockDiscussChannelMessagePost(channel.id, {
-        //     author_id: this.pyEnv.currentPartnerId,
-        //     body: '<div class="o_mail_notification">left the channel</div>',
-        //     subtype_xmlid: "mail.mt_comment",
-        // });
+        this._mockDiscussChannelMessagePost(channel.id, {
+            author_id: this.pyEnv.currentPartnerId,
+            body: '<div class="o_mail_notification">left the channel</div>',
+            subtype_xmlid: "mail.mt_comment",
+        });
         return true;
     },
     /**
@@ -436,6 +423,9 @@ patch(MockServer.prototype, {
     _mockDiscussChannelChannelFetched(ids) {
         const channels = this.getRecords("discuss.channel", [["id", "in", ids]]);
         for (const channel of channels) {
+            if (!["chat", "whatsapp"].includes(channel.channel_type)) {
+                continue;
+            }
             const channelMessages = this.getRecords("mail.message", [
                 ["model", "=", "discuss.channel"],
                 ["res_id", "=", channel.id],

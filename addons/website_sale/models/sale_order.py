@@ -215,7 +215,12 @@ class SaleOrder(models.Model):
 
         order_line = self._cart_update_order_line(product_id, quantity, order_line, **kwargs)
 
-        if order_line and order_line.price_unit == 0 and self.website_id.prevent_zero_price_sale:
+        if (
+            order_line
+            and order_line.price_unit == 0
+            and self.website_id.prevent_zero_price_sale
+            and product.detailed_type not in self.env['product.template']._get_product_types_allow_zero_price()
+        ):
             raise UserError(_(
                 "The given product does not have a price therefore it cannot be added to cart.",
             ))
@@ -488,7 +493,7 @@ class SaleOrder(models.Model):
             city = order_location['pick_up_point_town']
             zip_code = order_location['pick_up_point_postal_code']
             country = order.env['res.country'].search([('code', '=', order_location['pick_up_point_country'])]).id
-            state = order.env['res.country.state'].search(['&', ('code', '=', order_location['pick_up_point_state']), ('country_id.id', '=', country)]).id if (order_location['pick_up_point_state'] and country) else None
+            state = order.env['res.country.state'].search(['&', ('code', '=', order_location['pick_up_point_state']), ('country_id', '=', country)]).id if (order_location['pick_up_point_state'] and country) else None
             parent_id = order.partner_shipping_id.id
             email = order.partner_shipping_id.email
             phone = order.partner_shipping_id.phone
@@ -623,16 +628,10 @@ class SaleOrder(models.Model):
         return bool(carrier)
 
     def _get_delivery_methods(self):
-        def _is_carrier_available(carrier):
-            # Drop carriers where price computation fails (no price rule available/matching request)
-            res = carrier.rate_shipment(self)
-            return res['success']
         # searching on website_published will also search for available website (_search method on computed field)
         return self.env['delivery.carrier'].sudo().search([
             ('website_published', '=', True),
-        ]).available_carriers(
-            self.partner_shipping_id
-        ).filtered(_is_carrier_available)
+        ]).filtered(lambda carrier: carrier._is_available_for_order(self))
 
     #=== TOOLING ===#
 

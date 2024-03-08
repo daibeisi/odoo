@@ -17,7 +17,7 @@ from odoo.addons.test_mail.data import test_mail_data
 from odoo.addons.test_mail.data.test_mail_data import MAIL_TEMPLATE
 from odoo.addons.test_mail.models.test_mail_models import MailTestGateway
 from odoo.sql_db import Cursor
-from odoo.tests import tagged
+from odoo.tests import tagged, RecordCapturer
 from odoo.tools import email_split_and_format, formataddr, mute_logger
 
 
@@ -82,6 +82,19 @@ class TestEmailParsing(MailCommon):
 
         res = self.env['mail.thread'].message_parse(self.from_string(test_mail_data.MAIL_MULTIPART_WEIRD_FILENAME))
         self.assertEqual(res['attachments'][0][0], '62_@;,][)=.(ÇÀÉ.txt')
+
+    def test_message_parse_attachment_pdf_nonstandard_mime(self):
+        # This test checks if aliasing content-type (mime type) of "pdf" with "application/pdf" works correctly. (i.e. Treat "pdf" as "application/pdf")
+
+        # Baseline check. Parsing mail with "application/pdf"
+        mail_with_standard_mime = self.format(test_mail_data.MAIL_PDF_MIME_TEMPLATE, pdf_mime="application/pdf")
+        res_std = self.env['mail.thread'].message_parse(self.from_string(mail_with_standard_mime))
+        self.assertEqual(res_std['attachments'][0].content, test_mail_data.PDF_PARSED, "Attachment with Content-Type: application/pdf must parse without error")
+
+        # Parsing the same email, but with content-type set to "pdf"
+        mail_with_aliased_mime = self.format(test_mail_data.MAIL_PDF_MIME_TEMPLATE, pdf_mime="pdf")
+        res_alias = self.env['mail.thread'].message_parse(self.from_string(mail_with_aliased_mime))
+        self.assertEqual(res_alias['attachments'][0].content, test_mail_data.PDF_PARSED, "Attachment with aliased Content-Type: pdf must parse without error")
 
     def test_message_parse_bugs(self):
         """ Various corner cases or message parsing """
@@ -1729,6 +1742,35 @@ class TestMailgateway(MailCommon):
             self.assertEqual(file_content, attachment.raw.decode(encoding or 'utf-8'))
             if encoding not in ['', 'UTF-8']:
                 self.assertNotEqual(file_content, attachment.raw.decode('utf-8'))
+
+    def test_message_hebrew_iso8859_8_i(self):
+        # This subject was found inside an email of one of our customer.
+        # The charset is iso-8859-8-i which isn't natively supported by
+        # python, check that Odoo is still capable of decoding it.
+        subject = "בוקר טוב! צריך איימק ושתי מסכים"
+        encoded_subject = "=?iso-8859-8-i?B?4eX3+CDo5eEhIPb46eog4Onp7vcg5fn66SDu8evp7Q==?="
+
+        # This content was made up using google translate. The charset
+        # is iso-8859-8 which is natively supported by python.
+        charset = "iso-8859-8"
+        content = "שלום וברוכים הבאים למקרה המבחן הנפלא הזה"
+        encoded_content = base64.b64encode(content.encode(charset)).decode()
+
+        with RecordCapturer(self.env['mail.test.gateway'], []) as capture:
+            mail = test_mail_data.MAIL_FILE_ENCODING.format(
+                msg_id="<test_message_hebrew_iso8859_8_i@iron.sky>",
+                subject=encoded_subject,
+                charset=f'; charset="{charset}"',
+                content=encoded_content,
+            )
+            self.env['mail.thread'].message_process('mail.test.gateway', mail)
+
+        capture.records.ensure_one()
+        self.assertEqual(capture.records.name, subject)
+        self.assertEqual(
+            capture.records.message_ids.attachment_ids.raw.decode(charset),
+            content
+        )
 
     # --------------------------------------------------
     # Emails loop detection

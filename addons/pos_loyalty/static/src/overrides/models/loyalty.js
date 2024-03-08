@@ -25,13 +25,19 @@ export class PosLoyaltyCard {
      * @param {number} program_id id of loyalty.program
      * @param {number} partner_id id of res.partner
      * @param {number} balance points on the coupon, not counting the order's changes
+     * @param {string} expiration_date
      */
-    constructor(code, id, program_id, partner_id, balance) {
+    constructor(code, id, program_id, partner_id, balance, expiration_date = false) {
         this.code = code;
         this.id = id || nextId--;
         this.program_id = program_id;
         this.partner_id = partner_id;
         this.balance = balance;
+        this.expiration_date = expiration_date && new Date(expiration_date);
+    }
+
+    isExpired() {
+        return this.expiration_date && this.expiration_date < new Date();
     }
 }
 
@@ -432,6 +438,7 @@ patch(Order.prototype, {
                 args: {
                     product: line.reward_product_id,
                 },
+                reward_identifier_code: line.reward_identifier_code,
             };
             if (
                 claimedReward.reward.program_id.program_type === "gift_card" ||
@@ -440,7 +447,7 @@ patch(Order.prototype, {
                 paymentRewards.push(claimedReward);
             } else if (claimedReward.reward.reward_type === "product") {
                 productRewards.push(claimedReward);
-            } else {
+            } else if (!otherRewards.some(reward => reward.reward_identifier_code === claimedReward.reward_identifier_code)) {
                 otherRewards.push(claimedReward);
             }
             this.orderlines.remove(line);
@@ -973,15 +980,17 @@ patch(Order.prototype, {
                     continue;
                 }
                 let unclaimedQty;
-                if (reward.reward_type === "product" && !reward.multi_product) {
-                    const product = this.pos.db.get_product_by_id(reward.reward_product_ids[0]);
-                    unclaimedQty = this._computeUnclaimedFreeProductQty(
-                        reward,
-                        couponProgram.coupon_id,
-                        product,
-                        points
-                    );
-                    if (unclaimedQty <= 0) {
+                if (reward.reward_type === "product") {
+                    if (!reward.multi_product) {
+                        const product = this.pos.db.get_product_by_id(reward.reward_product_ids[0]);
+                        unclaimedQty = this._computeUnclaimedFreeProductQty(
+                            reward,
+                            couponProgram.coupon_id,
+                            product,
+                            points
+                        );
+                    }
+                    if (!unclaimedQty || unclaimedQty <= 0) {
                         continue;
                     }
                 }
@@ -1546,7 +1555,8 @@ patch(Order.prototype, {
                     payload.coupon_id,
                     payload.program_id,
                     payload.partner_id,
-                    payload.points
+                    payload.points,
+                    payload.expiration_date,
                 );
                 this.pos.couponCache[coupon.id] = coupon;
                 this.codeActivatedCoupons.push(coupon);

@@ -5,6 +5,7 @@ import csv
 from collections import defaultdict
 from functools import wraps
 from inspect import getmembers
+from copy import deepcopy
 
 import logging
 import re
@@ -14,7 +15,7 @@ from psycopg2.extras import Json
 from odoo import Command, _, models, api
 from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 from odoo.addons.account import SYSCOHADA_LIST
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import file_open, groupby
 from odoo.tools.translate import TranslationImporter
 
@@ -61,7 +62,7 @@ class AccountChartTemplate(models.AbstractModel):
         def is_template(func):
             return callable(func) and hasattr(func, '_l10n_template')
         template_register = defaultdict(lambda: defaultdict(list))
-        cls = type(self)
+        cls = self.env.registry[self._name]
         for _attr, func in getmembers(cls, is_template):
             template, model = func._l10n_template
             template_register[template][model].append(func)
@@ -70,7 +71,7 @@ class AccountChartTemplate(models.AbstractModel):
 
     def _setup_complete(self):
         super()._setup_complete()
-        type(self)._template_register = AccountChartTemplate._template_register
+        self.env.registry[self._name]._template_register = AccountChartTemplate._template_register
 
 
     # --------------------------------------------------------------------------------
@@ -264,6 +265,7 @@ class AccountChartTemplate(models.AbstractModel):
             return (
                 tax.amount_type != template.get('amount_type', 'percent')
                 or tax.amount != template.get('amount', 0)
+                or len(tax.repartition_line_ids) != len(template.get('repartition_line_ids', []))
             )
 
         obsolete_xmlid = set()
@@ -301,23 +303,23 @@ class AccountChartTemplate(models.AbstractModel):
                             for _c, _id, repartition_line in values.get('repartition_line_ids', []):
                                 tags = repartition_line.get('tag_ids')
                                 repartition_line.clear()
-                                if tags:
-                                    repartition_line['tag_ids'] = tags
+                                repartition_line['tag_ids'] = tags or [Command.clear()]
                 elif model_name == 'account.account':
                     # Point or create xmlid to existing record to avoid duplicate code
                     account = self.ref(xmlid, raise_if_not_found=False)
-                    if not account or (account and account.code != values['code']):
-                        existing_account = self.env['account.account'].search([
-                            *self.env['account.account']._check_company_domain(company),
-                            ('code', '=', values['code']),
-                        ])
-                        if existing_account:
+                    normalized_code = f'{values["code"]:<0{int(template_data.get("code_digits", 6))}}'
+                    if not account or not re.match(f'^{values["code"]}0*$', account.code):
+                        query = self.env['account.account']._search(self.env['account.account']._check_company_domain(company))
+                        query.add_where("account_account.code SIMILAR TO %s", [f'{values["code"]}0*'])
+                        accounts = self.env['account.account'].browse(query)
+                        account = accounts.sorted(key=lambda x: x.code != normalized_code)[0] if accounts else None
+                        if account:
                             self.env['ir.model.data']._update_xmlids([{
                                 'xml_id': f"account.{company.id}_{xmlid}",
-                                'record': existing_account,
+                                'record': account,
                                 'noupdate': True,
                             }])
-                            account = existing_account
+
                     # on existing accounts, only tag_ids are to be updated using default data
                     if account and 'tag_ids' in data[model_name][xmlid]:
                         data[model_name][xmlid] = {'tag_ids': data[model_name][xmlid]['tag_ids']}
@@ -397,6 +399,13 @@ class AccountChartTemplate(models.AbstractModel):
         for model in ('account.fiscal.position', 'account.reconcile.model'):
             if model in data:
                 data[model] = data.pop(model)
+
+        # Remove data of unknown fields present in the company template
+        company_data = data.get('res.company')
+        if company_data and not self.env.context.get('l10n_check_fields_complete'):
+            for fname in list(company_data.get(company.id)):
+                if fname not in company._fields:
+                    del data['res.company'][company.id][fname]
 
         return data
 
@@ -488,7 +497,7 @@ class AccountChartTemplate(models.AbstractModel):
                 created_models.add(model)
 
         created_vals = {}
-        for model, data in defer(list(data.items())):
+        for model, data in defer(list(deepcopy(data).items())):
             create_vals = []
             for xml_id, record in data.items():
                 # Extract the translations from the values
@@ -947,11 +956,25 @@ class AccountChartTemplate(models.AbstractModel):
         return parents
 
     def _get_tag_mapper(self, template_code):
-        tags = {x.name: x.id for x in self.env['account.account.tag'].search([
+        tags = {x.name: x.id for x in self.env['account.account.tag'].with_context(active_test=False).search([
             ('applicability', '=', 'taxes'),
             ('country_id', '=', self._get_chart_template_mapping()[template_code]['country_id']),
         ])}
-        return lambda *args: [tags[re.sub(r'\s+', ' ', x.strip())] if not re.match(r"^\w+\.\w+$", x) else x for x in args]
+
+        def mapping_getter(*args):
+            res = []
+            for tag in args:
+                if re.match(r"^\w+\.\w+$", tag):
+                    # xml_id => explicit data, doesn't need to be mapped
+                    res.append(tag)
+                else:
+                    format_tag = re.sub(r'\s+', ' ', tag.strip())
+                    mapped_tag = tags.get(format_tag)
+                    if not mapped_tag:
+                        raise UserError(_('Error while loading the localization. You should probably update your localization app first.'))
+                    res.append(mapped_tag)
+            return res
+        return mapping_getter
 
     def _deref_account_tags(self, template_code, tax_data):
         mapper = self._get_tag_mapper(template_code)

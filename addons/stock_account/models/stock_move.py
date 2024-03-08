@@ -20,6 +20,10 @@ class StockMove(models.Model):
     stock_valuation_layer_ids = fields.One2many('stock.valuation.layer', 'stock_move_id')
     analytic_account_line_ids = fields.Many2many('account.analytic.line', copy=False)
 
+    def _inverse_picked(self):
+        super()._inverse_picked()
+        self._account_analytic_entry_move()
+
     def _filter_anglo_saxon_moves(self, product):
         return self.filtered(lambda m: m.product_id.id == product.id)
 
@@ -420,18 +424,19 @@ class StockMove(models.Model):
 
         amount, unit_amount = 0, 0
         if self.state != 'done':
-            unit_amount = self.product_uom._compute_quantity(
-                self.quantity, self.product_id.uom_id)
-            # Falsy in FIFO but since it's an estimation we don't require exact correct cost. Otherwise
-            # we would have to recompute all the analytic estimation at each out.
-            amount = - unit_amount * self.product_id.standard_price
+            if self.picked:
+                unit_amount = self.product_uom._compute_quantity(
+                    self.quantity, self.product_id.uom_id)
+                # Falsy in FIFO but since it's an estimation we don't require exact correct cost. Otherwise
+                # we would have to recompute all the analytic estimation at each out.
+                amount = - unit_amount * self.product_id.standard_price
         elif self.product_id.valuation == 'real_time' and not self._ignore_automatic_valuation():
             accounts_data = self.product_id.product_tmpl_id.get_product_accounts()
             account_valuation = accounts_data.get('stock_valuation', False)
             analytic_line_vals = self.stock_valuation_layer_ids.account_move_id.line_ids.filtered(
                 lambda l: l.account_id == account_valuation)._prepare_analytic_lines()
-            amount = - sum(sum(vals['amount'] for vals in lists) for lists in analytic_line_vals)
-            unit_amount = - sum(sum(vals['unit_amount'] for vals in lists) for lists in analytic_line_vals)
+            amount = - sum(vals['amount'] for vals in analytic_line_vals)
+            unit_amount = - sum(vals['unit_amount'] for vals in analytic_line_vals)
         elif sum(self.stock_valuation_layer_ids.mapped('quantity')):
             amount = sum(self.stock_valuation_layer_ids.mapped('value'))
             unit_amount = - sum(self.stock_valuation_layer_ids.mapped('quantity'))
@@ -446,12 +451,12 @@ class StockMove(models.Model):
     def _ignore_automatic_valuation(self):
         return False
 
-    def _prepare_analytic_line_values(self, account, amount, unit_amount):
+    def _prepare_analytic_line_values(self, account_field_values, amount, unit_amount):
         self.ensure_one()
         return {
             'name': self.name,
             'amount': amount,
-            'auto_account_id': account,
+            **account_field_values,
             'unit_amount': unit_amount,
             'product_id': self.product_id.id,
             'product_uom_id': self.product_id.uom_id.id,
@@ -463,29 +468,33 @@ class StockMove(models.Model):
     def _generate_valuation_lines_data(self, partner_id, qty, debit_value, credit_value, debit_account_id, credit_account_id, svl_id, description):
         # This method returns a dictionary to provide an easy extension hook to modify the valuation lines (see purchase for an example)
         self.ensure_one()
-        debit_line_vals = {
+
+        line_vals = {
             'name': description,
             'product_id': self.product_id.id,
             'quantity': qty,
             'product_uom_id': self.product_id.uom_id.id,
             'ref': description,
             'partner_id': partner_id,
-            'balance': debit_value,
-            'account_id': debit_account_id,
         }
 
-        credit_line_vals = {
-            'name': description,
-            'product_id': self.product_id.id,
-            'quantity': qty,
-            'product_uom_id': self.product_id.uom_id.id,
-            'ref': description,
-            'partner_id': partner_id,
-            'balance': -credit_value,
-            'account_id': credit_account_id,
+        svl = self.env['stock.valuation.layer'].browse(svl_id)
+        if svl.account_move_line_id.analytic_distribution:
+            line_vals['analytic_distribution'] = svl.account_move_line_id.analytic_distribution
+
+        rslt = {
+            'credit_line_vals': {
+                **line_vals,
+                'balance': -credit_value,
+                'account_id': credit_account_id,
+            },
+            'debit_line_vals': {
+                **line_vals,
+                'balance': debit_value,
+                'account_id': debit_account_id,
+            },
         }
 
-        rslt = {'credit_line_vals': credit_line_vals, 'debit_line_vals': debit_line_vals}
         if credit_value != debit_value:
             # for supplier returns of product in average costing method, in anglo saxon mode
             diff_amount = debit_value - credit_value

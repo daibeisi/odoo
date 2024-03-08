@@ -4,9 +4,10 @@
 # 
 # Translators:
 # Martin Trigaux, 2023
-# Wil Odoo, 2023
-# Jolien De Paepe, 2023
+# Dylan Kiss, 2023
 # Erwin van der Ploeg <erwin@odooexperts.nl>, 2023
+# Jolien De Paepe, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
@@ -14,7 +15,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-10-26 21:55+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Erwin van der Ploeg <erwin@odooexperts.nl>, 2023\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Dutch (https://app.transifex.com/odoo/teams/41243/nl/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -987,7 +988,7 @@ msgstr ""
 "Laat de ontvanger toe om zelf zijn status op de zwarte lijst te beheren via "
 "de afmeldpagina. Als de optie actief is, is de knop 'Me blacklisten' "
 "verborgen op de afmeldpagina. De knop 'Kom terug' is altijd zichtbaar zodat "
-"leads en partners zich opnieuw kunnen abonneren."
+"leads en relaties zich opnieuw kunnen abonneren."
 
 #. module: mass_mailing
 #: model_terms:ir.ui.view,arch_db:mass_mailing.s_masonry_block_options
@@ -2343,12 +2344,12 @@ msgstr "Voetteksten"
 #: model_terms:ir.ui.view,arch_db:mass_mailing.s_company_team
 msgid ""
 "Founder and chief visionary, Tony is the driving force behind the company. "
-"He lovesto keep his hands full by participating in the development of the "
+"He loves to keep his hands full by participating in the development of the "
 "software, marketing, and customer experience strategies."
 msgstr ""
-"Oprichter en belangrijkste visionair, Tony is de drijvende kracht achter het"
-" bedrijf. Hij houdt ervan zijn handen vol te houden door deel te nemen aan "
-"de ontwikkeling van de software-, marketing- en klantervaringsstrategieën."
+"Oprichter en hoofdvisionair Tony is de drijvende kracht achter het bedrijf. "
+"Hij houdt ervan zijn handen vol te houden door deel te nemen aan de "
+"ontwikkeling van de software-, marketing- en klantervaringsstrategieën."
 
 #. module: mass_mailing
 #: model:ir.model.fields,field_description:mass_mailing.field_mailing_trace_report__email_from
@@ -2985,7 +2986,7 @@ msgstr "Mailinglijst #"
 #: model_terms:ir.ui.view,arch_db:mass_mailing.mailing_contact_view_search
 #: model_terms:ir.ui.view,arch_db:mass_mailing.mailing_contact_view_tree
 msgid "Mailing List Contacts"
-msgstr "Mailinglijst contacten"
+msgstr "Mailinglijstcontacten"
 
 #. module: mass_mailing
 #: model:ir.model,name:mass_mailing.model_mailing_subscription
@@ -3748,7 +3749,7 @@ msgstr ""
 #: model:ir.ui.menu,name:mass_mailing.mailing_menu_report_subscribe_reason
 #: model_terms:ir.ui.view,arch_db:mass_mailing.mailing_subscription_view_search
 msgid "Optout"
-msgstr "Afmelden"
+msgstr "Afgemeld"
 
 #. module: mass_mailing
 #: model_terms:ir.ui.view,arch_db:mass_mailing.mailing_subscription_view_search
@@ -3878,7 +3879,7 @@ msgstr "Voorkeur antwoord aan-adres"
 #. module: mass_mailing
 #: model:ir.model.fields,field_description:mass_mailing.field_mailing_mailing__preview
 msgid "Preview"
-msgstr "Preview"
+msgstr "Voorbeeld"
 
 #. module: mass_mailing
 #: model_terms:ir.ui.view,arch_db:mass_mailing.view_mail_mass_mailing_form
@@ -4697,7 +4698,7 @@ msgstr "Bedankt dat je bij ons aangesloten bent!"
 #. module: mass_mailing
 #: model_terms:ir.ui.view,arch_db:mass_mailing.s_text_block
 msgid "That way, Odoo evolves much faster than any other solution."
-msgstr "Daarom ontwikkeld Odoo zich veel sneller dan andere oplossingen."
+msgstr "Daarom ontwikkelt Odoo zich veel sneller dan andere oplossingen."
 
 #. module: mass_mailing
 #: model:ir.model.constraint,message:mass_mailing.constraint_mailing_mailing_percentage_valid
@@ -4727,7 +4728,7 @@ msgstr "Het filterdomein is niet geldig voor deze ontvangers."
 #: model:ir.model.fields,help:mass_mailing.field_mailing_list__is_public
 msgid ""
 "The mailing list can be accessible by recipients in the subscription "
-"management page to allows them to update their preferences."
+"management page to allow them to update their preferences."
 msgstr ""
 "De mailinglijst is toegankelijk voor ontvangers op de pagina voor "
 "abonnementsbeheer, zodat ze hun voorkeuren kunnen bijwerken."

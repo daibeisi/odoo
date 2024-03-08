@@ -45,7 +45,6 @@
     position: absolute;
     z-index: 10;
     padding: 0;
-    border: $border-width solid var(--o-table-ui-bg, #{$border-color});
 
     &:hover {
         visibility: visible !important;
@@ -119,7 +118,7 @@
     }
 }
 
-a.o_link_in_selection:not(.btn) {
+.odoo-editor-editable a.o_link_in_selection:not(.btn) {
     background-color: #a6e3e2;
     color: black !important;
     border: 1px dashed #008f8c;
@@ -298,9 +297,6 @@ a.o_link_in_selection:not(.btn) {
 .oe-tablepicker-size {
     text-align: center;
     margin-top: 7px;
-}
-.oe-tablepicker-size {
-    color: white;
 }
 
 @include media-breakpoint-down(md) {

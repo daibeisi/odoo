@@ -24,7 +24,7 @@ class Contract(models.Model):
     name = fields.Char('Contract Reference', required=True)
     active = fields.Boolean(default=True)
     structure_type_id = fields.Many2one('hr.payroll.structure.type', string="Salary Structure Type", compute="_compute_structure_type_id", readonly=False, store=True)
-    employee_id = fields.Many2one('hr.employee', string='Employee', tracking=True, domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
+    employee_id = fields.Many2one('hr.employee', string='Employee', tracking=True, domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", index=True)
     department_id = fields.Many2one('hr.department', compute='_compute_employee_contract', store=True, readonly=False,
         domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", string="Department")
     job_id = fields.Many2one('hr.job', compute='_compute_employee_contract', store=True, readonly=False,
@@ -84,7 +84,7 @@ class Contract(models.Model):
             contract.calendar_mismatch = contract.resource_calendar_id != contract.employee_id.resource_calendar_id
 
     def _expand_states(self, states, domain, order):
-        return [key for key, val in type(self).state.selection]
+        return [key for key, val in self._fields['state'].selection]
 
     @api.depends('employee_id')
     def _compute_employee_contract(self):
@@ -96,11 +96,21 @@ class Contract(models.Model):
 
     @api.depends('company_id')
     def _compute_structure_type_id(self):
-        structure_type_id = self.env['hr.payroll.structure.type'].search([('country_id', '=', self.company_id.country_id.id)], limit=1)
-        if not structure_type_id:
-            structure_type_id = self.env['hr.payroll.structure.type'].search([('country_id', '=', False)], limit=1)
+
+        default_structure_by_country = {}
+
+        def _default_salary_structure(country_id):
+            default_structure = default_structure_by_country.get(country_id)
+            if default_structure is None:
+                default_structure = default_structure_by_country[country_id] = (
+                    self.env['hr.payroll.structure.type'].search([('country_id', '=', country_id)], limit=1)
+                    or self.env['hr.payroll.structure.type'].search([('country_id', '=', False)], limit=1)
+                )
+            return default_structure
+
         for contract in self:
-            contract.structure_type_id = structure_type_id
+            if not contract.structure_type_id or contract.structure_type_id.country_id != contract.company_id.country_id:
+                contract.structure_type_id = _default_salary_structure(contract.company_id.country_id.id)
 
     @api.onchange('structure_type_id')
     def _onchange_structure_type_id(self):
@@ -285,7 +295,7 @@ class Contract(models.Model):
                     ('state', '=', 'open'),
                 ]).filtered(lambda c: c.date_start <= today and (not c.date_end or c.date_end >= today))
                 if running_contract:
-                    contract.employee_id.contract_id = running_contract[0]
+                    contract.employee_id.sudo().contract_id = running_contract[0]
         if vals.get('state') == 'close':
             for contract in self.filtered(lambda c: not c.date_end):
                 contract.date_end = max(date.today(), contract.date_start)

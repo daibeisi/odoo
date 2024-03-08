@@ -17,7 +17,9 @@ except ImportError:
 from odoo.api import Environment
 from odoo.tests import common, new_test_user
 from .common import WebsocketCase
+from .. import websocket as websocket_module
 from ..models.bus import dispatch
+from ..models.ir_websocket import IrWebsocket
 from ..websocket import (
     CloseCode,
     Frame,
@@ -32,7 +34,7 @@ from ..websocket import (
 class TestWebsocketCaryall(WebsocketCase):
     def test_lifecycle_hooks(self):
         events = []
-        with patch.object(Websocket, '_event_callbacks', defaultdict(set)):
+        with patch.object(Websocket, '_Websocket__event_callbacks', defaultdict(set)):
             @Websocket.onopen
             def onopen(env, websocket):  # pylint: disable=unused-variable
                 self.assertIsInstance(env, Environment)
@@ -51,10 +53,10 @@ class TestWebsocketCaryall(WebsocketCase):
             self.assertEqual(events, ['open', 'close'])
 
     def test_instances_weak_set(self):
-        with patch.object(Websocket, "_instances", WeakSet()):
+        with patch.object(websocket_module, "_websocket_instances", WeakSet()):
             first_ws = self.websocket_connect()
             second_ws = self.websocket_connect()
-            self.assertEqual(len(Websocket._instances), 2)
+            self.assertEqual(len(websocket_module._websocket_instances), 2)
             first_ws.close(CloseCode.CLEAN)
             second_ws.close(CloseCode.CLEAN)
             self.wait_remaining_websocket_connections()
@@ -62,7 +64,7 @@ class TestWebsocketCaryall(WebsocketCase):
             # collected. Stop it now.
             self._serve_forever_patch.stop()
             gc.collect()
-            self.assertEqual(len(Websocket._instances), 0)
+            self.assertEqual(len(websocket_module._websocket_instances), 0)
 
     def test_timeout_manager_no_response_timeout(self):
         with freeze_time('2022-08-19') as frozen_time:
@@ -201,8 +203,35 @@ class TestWebsocketCaryall(WebsocketCase):
             self.subscribe(websocket, ['my_channel'], client_last_notification_id)
             self.assertEqual(mock.call_args[0][2], client_last_notification_id)
 
+    def test_subscribe_to_custom_channel(self):
+        channel = self.env["res.partner"].create({"name": "John"})
+        websocket = self.websocket_connect()
+        with patch.object(IrWebsocket, "_build_bus_channel_list", return_value=[channel]):
+            self.subscribe(websocket, [], self.env['bus.bus']._bus_last_id())
+            self.env["bus.bus"]._sendmany([
+                (channel, "notif_on_global_channel", "message"),
+                ((channel, "PRIVATE"), "notif_on_private_channel", "message"),
+            ])
+            self.trigger_notification_dispatching([channel, (channel, "PRIVATE")])
+            notifications = json.loads(websocket.recv())
+            self.assertEqual(len(notifications), 1)
+            self.assertEqual(notifications[0]['message']['type'], 'notif_on_global_channel')
+            self.assertEqual(notifications[0]['message']['payload'], 'message')
+
+        with patch.object(IrWebsocket, "_build_bus_channel_list", return_value=[(channel, "PRIVATE")]):
+            self.subscribe(websocket, [], self.env['bus.bus']._bus_last_id())
+            self.env["bus.bus"]._sendmany([
+                (channel, "notif_on_global_channel", "message"),
+                ((channel, "PRIVATE"), "notif_on_private_channel", "message"),
+            ])
+            self.trigger_notification_dispatching([channel, (channel, "PRIVATE")])
+            notifications = json.loads(websocket.recv())
+            self.assertEqual(len(notifications), 1)
+            self.assertEqual(notifications[0]['message']['type'], 'notif_on_private_channel')
+            self.assertEqual(notifications[0]['message']['payload'], 'message')
+
     def test_no_cursor_when_no_callback_for_lifecycle_event(self):
-        with patch.object(Websocket, '_event_callbacks', defaultdict(set)):
+        with patch.object(Websocket, '_Websocket__event_callbacks', defaultdict(set)):
             with patch('odoo.addons.bus.websocket.acquire_cursor') as mock:
                 self.websocket_connect()
                 self.assertFalse(mock.called)

@@ -2,6 +2,7 @@
 
 import { loadEmoji } from "@web/core/emoji_picker/emoji_picker";
 import { DEFAULT_AVATAR } from "@mail/core/common/persona_service";
+import { Record } from "@mail/core/common/record";
 import { prettifyMessageContent } from "@mail/utils/common/format";
 
 import { browser } from "@web/core/browser/browser";
@@ -10,6 +11,7 @@ import { registry } from "@web/core/registry";
 import { memoize } from "@web/core/utils/functions";
 import { url } from "@web/core/utils/urls";
 import { escape } from "@web/core/utils/strings";
+import { compareDatetime } from "@mail/utils/common/misc";
 
 const FETCH_LIMIT = 30;
 
@@ -59,11 +61,23 @@ export class ThreadService {
     }
 
     async fetchChannelMembers(thread) {
+        if (thread.fetchMembersState === "pending") {
+            return;
+        }
+        const previousState = thread.fetchMembersState;
+        thread.fetchMembersState = "pending";
         const known_member_ids = thread.channelMembers.map((channelMember) => channelMember.id);
-        const results = await this.rpc("/discuss/channel/members", {
-            channel_id: thread.id,
-            known_member_ids: known_member_ids,
-        });
+        let results;
+        try {
+            results = await this.rpc("/discuss/channel/members", {
+                channel_id: thread.id,
+                known_member_ids: known_member_ids,
+            });
+        } catch (e) {
+            thread.fetchMembersState = previousState;
+            throw e;
+        }
+        thread.fetchMembersState = "fetched";
         let channelMembers = [];
         if (
             results["channelMembers"] &&
@@ -73,11 +87,13 @@ export class ThreadService {
             channelMembers = results["channelMembers"][0][1];
         }
         thread.memberCount = results["memberCount"];
-        for (const channelMember of channelMembers) {
-            if (channelMember.persona || channelMember.partner) {
-                thread.channelMembers.add({ ...channelMember, thread });
+        Record.MAKE_UPDATE(() => {
+            for (const channelMember of channelMembers) {
+                if (channelMember.persona || channelMember.partner) {
+                    thread.channelMembers.add({ ...channelMember, thread });
+                }
             }
-        }
+        });
     }
 
     /**
@@ -255,12 +271,14 @@ export class ThreadService {
             // same for needaction messages, special case for mailbox:
             // kinda "fetch new/more" with needactions on many origin threads at once
             if (thread.eq(this.store.discuss.inbox)) {
-                for (const message of fetched) {
-                    const thread = message.originThread;
-                    if (message.notIn(thread.needactionMessages)) {
-                        thread.needactionMessages.unshift(message);
+                Record.MAKE_UPDATE(() => {
+                    for (const message of fetched) {
+                        const thread = message.originThread;
+                        if (thread && message.notIn(thread.needactionMessages)) {
+                            thread.needactionMessages.unshift(message);
+                        }
                     }
-                }
+                });
             } else {
                 const startNeedactionIndex =
                     after === undefined
@@ -329,13 +347,18 @@ export class ThreadService {
         }
         if (ids.length) {
             const previews = await this.orm.call("discuss.channel", "channel_fetch_preview", [ids]);
-            for (const preview of previews) {
-                const thread = this.store.Thread.get({ model: "discuss.channel", id: preview.id });
-                const message = this.store.Message.insert(preview.last_message, { html: true });
-                if (message.isNeedaction) {
-                    thread.needactionMessages.add(message);
+            Record.MAKE_UPDATE(() => {
+                for (const preview of previews) {
+                    const thread = this.store.Thread.get({
+                        model: "discuss.channel",
+                        id: preview.id,
+                    });
+                    const message = this.store.Message.insert(preview.last_message, { html: true });
+                    if (message.isNeedaction) {
+                        thread.needactionMessages.add(message);
+                    }
                 }
-            }
+            });
         }
     });
 
@@ -394,15 +417,15 @@ export class ThreadService {
     }
 
     async unpin(thread) {
+        thread.isLocallyPinned = false;
         if (thread.eq(this.store.discuss.thread)) {
             this.router.replaceState({ active_id: undefined });
         }
-        if (thread.model !== "discuss.channel") {
-            return;
+        if (thread.model === "discuss.channel" && thread.is_pinned) {
+            return this.orm.silent.call("discuss.channel", "channel_pin", [thread.id], {
+                pinned: false,
+            });
         }
-        return this.orm.silent.call("discuss.channel", "channel_pin", [thread.id], {
-            pinned: false,
-        });
     }
 
     pin(thread) {
@@ -421,15 +444,17 @@ export class ThreadService {
             String.prototype.localeCompare.call(t1.name, t2.name)
         );
         this.store.discuss.chats.threads.sort(
-            (t1, t2) => t2.lastInterestDateTime.ts - t1.lastInterestDateTime.ts
+            (t1, t2) =>
+                compareDatetime(t2.lastInterestDateTime, t1.lastInterestDateTime) || t2.id - t1.id
         );
     }
 
     /**
      * @param {import("models").Thread} thread
      * @param {boolean} replaceNewMessageChatWindow
+     * @param {Object} [options]
      */
-    open(thread, replaceNewMessageChatWindow) {
+    open(thread, replaceNewMessageChatWindow, options) {
         this.setDiscussThread(thread);
     }
 
@@ -617,7 +642,10 @@ export class ThreadService {
      * @param {import("models").Thread} thread
      * @param {boolean} pushState
      */
-    setDiscussThread(thread, pushState = true) {
+    setDiscussThread(thread, pushState) {
+        if (pushState === undefined) {
+            pushState = thread.localId !== this.store.discuss.thread?.localId;
+        }
         this.store.discuss.thread = thread;
         const activeId =
             typeof thread.id === "string"
@@ -748,14 +776,18 @@ export class ThreadService {
               })
             : undefined;
         const partner_ids = validMentions?.partners.map((partner) => partner.id);
-        let recipientEmails = [];
+        const recipientEmails = [];
+        const recipientAdditionalValues = {};
         if (!isNote) {
             const recipientIds = thread.suggestedRecipients
                 .filter((recipient) => recipient.persona && recipient.checked)
                 .map((recipient) => recipient.persona.id);
-            recipientEmails = thread.suggestedRecipients
+            thread.suggestedRecipients
                 .filter((recipient) => recipient.checked && !recipient.persona)
-                .map((recipient) => recipient.email);
+                .forEach((recipient) => {
+                    recipientEmails.push(recipient.email);
+                    recipientAdditionalValues[recipient.email] = recipient.defaultCreateValues;
+                });
             partner_ids?.push(...recipientIds);
         }
         return {
@@ -771,6 +803,7 @@ export class ThreadService {
                 partner_ids,
                 subtype_xmlid: subtype,
                 partner_emails: recipientEmails,
+                partner_additional_values: recipientAdditionalValues,
             },
             thread_id: thread.id,
             thread_model: thread.model,
@@ -925,13 +958,9 @@ export class ThreadService {
      * @param {Message} message
      */
     notifyMessageToUser(thread, message) {
-        if (
-            thread.type === "channel" &&
-            message.recipients?.includes(this.store.user) &&
-            message.notIn(thread.needactionMessages)
-        ) {
-            thread.needactionMessages.add(message);
-            thread.message_needaction_counter++;
+        let notify = thread.type !== "channel";
+        if (thread.type === "channel" && message.recipients?.includes(this.store.user)) {
+            notify = true;
         }
         if (
             thread.chatPartner?.eq(this.store.odoobot) ||
@@ -942,8 +971,10 @@ export class ThreadService {
         ) {
             return;
         }
-        this.store.ChatWindow.insert({ thread });
-        this.outOfFocusService.notify(message, thread);
+        if (notify) {
+            this.store.ChatWindow.insert({ thread });
+            this.outOfFocusService.notify(message, thread);
+        }
     }
 
     /**
