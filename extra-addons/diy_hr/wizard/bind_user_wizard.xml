@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record model="ir.ui.view" id="view_diy_hr_bind_user_wizard_form">
+            <field name="name">view.diy.hr.bind.user.wizard.form</field>
+            <field name="model">diy.hr.bind.user.wizard</field>
+            <field name="arch" type="xml">
+                <form>
+                    <group >
+                        <field name="user_id" />
+                        <footer>
+                            <button string='确定' name="bind_user" type="object" class="oe_highlight"/>
+                            或
+                            <button string="取消" class="oe_highlight" special="cancel"/>
+                        </footer>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="act_window_diy_hr_bind_user_wizard">
+            <field name="name">绑定用户</field>
+            <field name="res_model">diy.hr.bind.user.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_diy_hr_bind_user_wizard_form"/>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

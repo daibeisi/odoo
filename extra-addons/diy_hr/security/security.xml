@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+<!--    <record id="hr_diy.module_kamax_category" model="ir.module.category">-->
+<!--        <field name="name">KAMAX</field>-->
+<!--    </record>-->
+
+<!--    <record id="base.group_user" model="res.groups">-->
+<!--        <field name="name">普通用户</field>-->
+<!--    </record>-->
+
+<!--    &lt;!&ndash;员工&ndash;&gt;-->
+<!--    &lt;!&ndash;普通员工&ndash;&gt;-->
+<!--    <record id="group_hr_user" model="res.groups">-->
+<!--        <field name="name">普通员工</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>-->
+<!--        <field name="comment">普通员工</field>-->
+<!--    </record>-->
+
+<!--    &lt;!&ndash;  项目负责人  &ndash;&gt;-->
+<!--    <record id="group_hr_project_manager" model="res.groups">-->
+<!--        <field name="name">项目负责人</field>-->
+<!--        <field name="comment">项目负责人</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('hr_diy.group_hr_user'))]"/>-->
+<!--    </record>-->
+
+<!--    &lt;!&ndash;  EHS  &ndash;&gt;-->
+<!--    <record id="group_hr_ehs" model="res.groups">-->
+<!--        <field name="name">EHS</field>-->
+<!--        <field name="comment">EHS</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('hr_diy.group_hr_user'))]"/>-->
+<!--    </record>-->
+
+<!--    &lt;!&ndash;  部门负责人  &ndash;&gt;-->
+<!--    <record id="group_hr_department_manager" model="res.groups">-->
+<!--        <field name="name">部门负责人</field>-->
+<!--        <field name="comment">部门负责人</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('hr_diy.group_hr_user'))]"/>-->
+<!--    </record>-->
+
+
+<!--    &lt;!&ndash;  Key User  &ndash;&gt;-->
+<!--    <record id="group_hr_department_key_user" model="res.groups">-->
+<!--        <field name="name">Key User</field>-->
+<!--        <field name="comment">Key User</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('hr_diy.group_hr_user'))]"/>-->
+<!--    </record>-->
+
+
+
+<!--    &lt;!&ndash;管理员&ndash;&gt;-->
+<!--    <record id="group_hr_manager" model="res.groups">-->
+<!--        <field name="name">管理员</field>-->
+<!--        <field name="comment">管理员</field>-->
+<!--        <field name="category_id" ref="hr_diy.module_kamax_category"/>-->
+<!--        <field name="implied_ids" eval="[(4, ref('hr_diy.group_hr_user'))]"/>-->
+<!--        &lt;!&ndash;<field name="users" eval="[(4, ref('base.user_root'))]"/>&ndash;&gt;-->
+<!--    </record>-->
+
+<!--    <data noupdate="1">-->
+<!--        <record id="base.default_user" model="res.users">-->
+<!--            <field name="groups_id" eval="[(4,ref('hr_diy.group_hr_user'))]"/>-->
+<!--        </record>-->
+<!--    </data>-->
+
+</odoo>

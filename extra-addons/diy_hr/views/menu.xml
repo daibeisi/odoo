@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Top menu item -->
+        <menuitem id="menu_1_diy_hr_admin" name="组织架构"
+                  web_icon="hr,static/description/icon.png" sequence="75"/>
+            <menuitem id="menu_2_diy_hr_department_manage" name="部门管理" parent="menu_1_diy_hr_admin"
+                      action="act_window_diy_hr_department" sequence="10"/>
+            <menuitem id="menu_2_diy_hr_employee_manage" name="员工管理" parent="menu_1_diy_hr_admin"
+                      action="act_window_diy_hr_employee" sequence="20"/>
+
+
+    </data>
+</odoo>

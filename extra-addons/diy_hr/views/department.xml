@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record model="ir.ui.view" id="view_diy_hr_department_form">
+            <field name="name">view_diy_hr_department_form</field>
+            <field name="model">diy.hr.department</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="parent_id"/>
+                            </group>
+                            <group>
+                                <field name="manager_id"/>
+                            </group>
+                        </group>
+                        <group string="部门成员" col="4">
+                            <field name="member_ids" nolabel="1" colspan="4">
+                                <tree limit="10">
+                                    <field name="name"/>
+                                    <field name="telephone"/>
+                                    <field name="mobile_phone"/>
+                                    <field name="work_email"/>
+                                </tree>
+                            </field>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="view_diy_hr_department_list">
+            <field name="name">view_diy_hr_department_list</field>
+            <field name="model">diy.hr.department</field>
+            <field name="field_parent">child_ids</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="name"/>
+                    <field name="manager_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="view_diy_hr_department_filter">
+            <field name="name">view_diy_hr_department_filter</field>
+            <field name="model">diy.hr.department</field>
+            <field name="arch" type="xml">
+                <search string="Departments">
+                    <field name="name" string="Department"/>
+                    <field name="manager_id"/>
+                    <separator/>
+                    <filter string="失效" name="inactive" domain="[('active','=',False)]"/>
+                </search>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="view_diy_hr_department_kanban">
+            <field name="name">view_diy_hr_department_kanban</field>
+            <field name="model">diy.hr.department</field>
+            <field name="arch" type="xml">
+                <kanban>
+                    <field name="manager_id"/>
+                    <field name="parent_id"/>
+                    <templates>
+                        <t t-name="kanban-box">
+                          <div class="oe_module_vignette oe_kanban_global_click">
+                            <div class="oe_module_desc">
+                                <h4><field name="name"/></h4>
+                                <p class="oe_module_name">
+                                    <i>负责人：<field name="manager_id"/><br/></i>
+                                    <i>上级部门：<field name="parent_id"/><br/></i>
+                                </p>
+                            </div>
+                          </div>
+                        </t>
+                  </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="act_window_diy_hr_department">
+            <field name="name">部门管理</field>
+            <field name="res_model">diy.hr.department</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <field name="search_view_id" ref="view_diy_hr_department_filter"/>
+            <field name="context">{
+                'search_default_filter_active': 1
+            }</field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                    Click to create a department.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

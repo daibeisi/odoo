@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="web.NavBar" t-inherit-mode="extension" owl="1">
+      <xpath expr="//nav[hasclass('o_main_navbar')]" position="replace">
+        <nav class="o_main_navbar d-flex justify-content-between"
+			 t-on-dropdown-item-selected="onNavBarDropdownItemSelection"
+			 data-command-category="navbar">
+	  	  <!-- Systray -->
+			<div class="o_menu_systray d-flex" role="menu">
+            <t t-foreach="systrayItems" t-as="item" t-key="item_index">
+              <ErrorHandler onError="error => handleItemError(error, item)">
+                <t t-component="item.Component" t-props="item.props"/>
+              </ErrorHandler>
+            </t>
+          </div>
+        </nav>
+
+		<div class="sidebar_panel" id="sidebar_panel">
+          <div class="sidebar">
+            <div class="sidebar_logo">
+              <img src="/diy_backend_theme/static/src/img/logo.png" class="logo_img"/>
+            </div>
+			  <t t-set="curr_app" t-value="currentMenuId? menuService.getMenuAsTree(currentMenuId): null"/>
+			  <ul class="sidebar_menu">
+		    	<t t-foreach="menuService.getApps()" t-as="main_menu" t-key="main_menu.name">
+		    		<t t-if="!main_menu.children.length">
+		    			<li>
+		    				<a t-attf-href="#menu_id={{main_menu.id}}&amp;action={{main_menu.actionID ? main_menu.actionID : ''}}"
+							   t-att-data-menu="main_menu.id"
+							   t-attf-data-action-model="{{main_menu.actionModel ? main_menu.actionModel : ''}}"
+							   t-attf-data-action-id="{{main_menu.actionID ? main_menu.actionID : ''}}"
+							   t-att-data-menu-xmlid="main_menu.xmlid" t-attf-class="main_link">
+		    					<span class="app_icon me-2">
+
+								</span>
+								<span>
+		    						<t t-esc="main_menu.name"/>
+		    					</span>
+		    				</a>
+		    			</li>
+		    		</t>
+					<t t-else="">
+						<li class="menu-hasdropdown">
+							<a t-attf-href="#menu_id={{main_menu.id}}&amp;action={{main_menu.actionID ? main_menu.actionID : ''}}" t-att-data-menu="main_menu.id"
+							   t-attf-data-action-model="{{main_menu.actionModel ? main_menu.actionModel : ''}}"
+							   t-attf-data-action-id="{{main_menu.actionID ? main_menu.actionID : ''}}"
+							   t-att-data-menu-xmlid="main_menu.xmlid" t-attf-class="main_link dropdown-btn"
+							   t-attf-data-bs-target="#child_menu_{{main_menu.id}}"
+							   data-bs-toggle="collapse">
+								<span class="app_icon me-2">
+
+								</span>
+								<span>
+									<t t-esc="main_menu.name"/>
+								</span>
+								<span class="fa fa-chevron-left" style="position: absolute; right: 10%;"/>
+							</a>
+							<ul t-attf-class="main header-sub-menus sub-menu-dropdown collapse #{curr_app &amp;&amp; curr_app.appID == main_menu.appID ?'show':''}" t-attf-id="child_menu_{{main_menu.id}}">
+								<t t-set="parent_menu_id" t-value="main_menu.id" />
+								<t t-foreach="main_menu.children" t-as="menuid" t-key="menuid">
+									<t t-set="menu" t-value="menuService.getMenuAsTree(menuid)"/>
+									<t t-call="AllmenuRecursive">
+									</t>
+								</t>
+							</ul>
+						</li>
+					</t>
+		      </t>
+		    </ul>
+          </div>
+        </div>
+      </xpath>
+    </t>
+
+	<t t-inherit="web.NavBar.AppsMenu" t-inherit-mode="extension" owl="1">
+        <xpath expr="//Dropdown" position="replace">
+            <li class="dropdown">
+                <a id="openSidebar" style="display: block; cursor: pointer;">
+                    <i class="fa fa-bars fa-lg"/>
+                </a>
+				<a id="closeSidebar" style="display: none; cursor: pointer;">
+                    <i class="fa fa-bars fa-lg"/>
+                </a>
+            </li>
+        </xpath>
+    </t>
+
+	<t t-inherit="web.UserMenu" t-inherit-mode="extension" owl="1">
+        <xpath expr="//span[hasclass('oe_topbar_name')]" position="replace">
+            <div class="oe_topbar_name"/>
+        </xpath>
+    </t>
+
+	<t t-name="AllmenuRecursive" owl="1">
+		<li class="menu-hasdropdown">
+			<t t-if="menu.childrenTree.length">
+				<a class="d-flex align-items-center w-100 sub-main-menu" data-bs-toggle="collapse" t-attf-data-bs-target="#child_menu_{{menu.id}}" t-att-data-menu-xmlid="menu.xmlid">
+					<span><t t-esc="menu.name"/></span>
+					<span class="fa fa-chevron-left" style="position: absolute; right: 10%;"/>
+				</a>
+				<div t-attf-id="child_menu_{{menu.id}}" class="collapse">
+					<ul class="header-sub-menus">
+						<t t-foreach="menu.children" t-as="menuid" t-key="menuid">
+							<t t-set="menu" t-value="menuService.getMenuAsTree(menuid)"/>
+							<t t-call="AllmenuRecursive" />
+						</t>
+					</ul>
+				</div>
+			</t>
+			<t t-else="">
+				<a t-att-data-menu="menu.id" t-attf-class="child_menus" t-attf-href="#menu_id={{menu.id}}&amp;action={{menu.actionID ? menu.actionID : ''}}" t-att-data-menu-xmlid="menu.xmlid" t-attf-data-action-id="{{menu.actionID ? menu.actionID : ''}}">
+					<span class="app_name">
+						<t t-esc="menu.name"/>
+					</span>
+				</a>
+			</t>
+		</li>
+	</t>
+</templates>

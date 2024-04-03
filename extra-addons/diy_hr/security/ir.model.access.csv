@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+
+access_diy_hr_employee,access_diy_hr_employee,model_diy_hr_employee,,1,0,0,0
+
+access_diy_hr_department,access_diy_hr_department,model_diy_hr_department,,1,0,0,0
+
+
+access_diy_hr_edit_user_password_wizard,access_diy_hr_edit_user_password_wizard,model_diy_hr_edit_user_password_wizard,,1,1,1,1
+access_diy_hr_create_user_wizard,access_diy_hr_create_user_wizard,model_diy_hr_create_user_wizard,,1,1,1,1
+access_diy_hr_bind_user_wizard,access_diy_hr_bind_user_wizard,model_diy_hr_bind_user_wizard,,1,1,1,1
+

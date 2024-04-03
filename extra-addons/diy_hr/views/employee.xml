@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record model="ir.ui.view" id="view_diy_hr_employee_form">
+            <field name="name">view_diy_hr_employee_form</field>
+            <field name="model">diy.hr.employee</field>
+            <field name="arch" type="xml">
+                <form string="Employee">
+                    <sheet>
+                        <field name="user_id" invisible="1"/>
+                        <field name="user_active" invisible="1"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="%(act_window_diy_hr_create_user_wizard)d" type="action"
+                                    icon="fa-user-plus" class="oe_stat_button" string="创建用户"
+                                    attrs="{'invisible':[('user_id','!=',False)]}"/>
+                            <button name="%(act_window_diy_hr_bind_user_wizard)d" type="action"
+                                    icon="fa-user" class="oe_stat_button" string="绑定用户"
+                                    attrs="{'invisible':[('user_id','!=',False)]}"/>
+                            <button name="%(act_window_diy_hr_edit_user_password_wizard)d" type="action"
+                                    icon="fa-edit" class="oe_stat_button" string="修改密码"
+                                    context="{'default_user_id': user_id}"
+                                    attrs="{'invisible':[('user_id','=',False)]}"/>
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive"
+                                    attrs="{'invisible':[('user_id','!=',False),('user_active','=',True)]}" string="激活用户">
+                            </button>
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive"
+                                    attrs="{'invisible':[('user_id','!=',False),('user_active','=',False)]}" string="冻结用户">
+                            </button>
+                        </div>
+<!--                        <field name="image" widget='image' class="oe_avatar"
+                               options='{"preview_image":"image_medium"}'/> -->
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only"/>
+                            <h1>
+                                <field name="name" placeholder="Employee's Name"/>
+                            </h1>
+                        </div>
+                        <group string="基本信息">
+                            <group>
+                                <field name="mobile_phone"/>
+                                <field name="group_ids" widget="many2many_tags"/>
+                                <field name="gender"/>
+                            </group>
+                            <group>
+                                <field name="work_email"/>
+                                <field name="telephone"/>
+                                <field name="birthday"/>
+                            </group>
+                        </group>
+                        <group string="工作信息" >
+                            <group>
+                                <field name="dep_id"/>
+                            </group>
+                            <group>
+                                <field name="work_location"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="view_diy_hr_employee_list">
+            <field name="name">view_diy_hr_employee_list</field>
+            <field name="model">diy.hr.employee</field>
+            <field name="arch" type="xml">
+                <tree string="Employees">
+                    <field name="name"/>
+                    <field name="dep_id"/>
+                    <field name="telephone"/>
+                    <field name="mobile_phone"/>
+                    <field name="work_email"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="view_diy_hr_employee_filter">
+            <field name="name">view_diy_hr_employee_filter</field>
+            <field name="model">diy.hr.employee</field>
+            <field name="arch" type="xml">
+                <search string="Employees">
+                    <field name="name" string="姓名"
+                           filter_domain="['|',('work_email','ilike',self),('name','ilike',self)]"/>
+                    <field name="dep_id" string="部门"/>
+                </search>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="act_window_diy_hr_employee">
+            <field name="name">Employees</field>
+            <field name="res_model">diy.hr.employee</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <field name="search_view_id" ref="view_diy_hr_employee_filter"/>
+            <field name="context">{
+                "search_default_department_id": [active_id],
+                "default_department_id": active_id}
+            </field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                    Click to add a new employee.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>
